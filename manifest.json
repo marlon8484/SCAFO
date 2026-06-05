@@ -1,0 +1,15 @@
+{
+  "name": "SCAFO produkcja",
+  "short_name": "SCAFO",
+  "description": "System raportowania pracy, magazyn i wypłaty",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EFEFED",
+  "theme_color": "#185FA5",
+  "lang": "pl",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
