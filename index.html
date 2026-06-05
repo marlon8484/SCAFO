@@ -2952,7 +2952,7 @@ if(!projects.length){
 showLogin();
 </script>
 <script>if("serviceWorker"in navigator){
-  navigator.serviceWorker.register("sw.js")
+  navigator.serviceWorker.register("/SCAFO/sw.js")
     .then(reg=>{
       reg.addEventListener('updatefound',()=>{
         const newWorker=reg.installing;
