@@ -654,6 +654,85 @@ textarea{resize:none;height:56px}
 </div>
 <script>
 const MANAGER_PIN='0901';
+// ── SUPABASE CONFIG ──
+const SUPA_URL='https://orshwfdzvcyzqssvtxgn.supabase.co';
+const SUPA_KEY='sb_publishable_BcBC8j513C8-vQECCZq4Wg_XqWJRzbt';
+
+async function supaLoad(){
+  try{
+    const res=await fetch(`${SUPA_URL}/rest/v1/scafo_data?id=eq.main&select=*`,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    if(!res.ok) throw new Error('Load failed: '+res.status);
+    const rows=await res.json();
+    if(rows&&rows.length>0){
+      const d=rows[0];
+      if(d.workers) workers=d.workers;
+      if(d.catalog) catalog=d.catalog;
+      if(d.projects) projects=d.projects;
+      if(d.orders) orders=d.orders;
+      if(d.reports) reports=d.reports;
+      if(d.payouts) payouts=d.payouts;
+      if(d.shipments) shipments=d.shipments;
+      if(d.transports) transports=d.transports;
+      if(d.adjustments) adjustments=d.adjustments;
+      if(d.vacations) vacations=d.vacations;
+      // also sync to localStorage as backup
+      localStorage.setItem('pa6_workers',JSON.stringify(workers));
+      localStorage.setItem('pa6_catalog',JSON.stringify(catalog));
+      localStorage.setItem('pa6_projects',JSON.stringify(projects));
+      localStorage.setItem('pa6_orders',JSON.stringify(orders));
+      localStorage.setItem('pa6_reports',JSON.stringify(reports));
+      localStorage.setItem('pa6_payouts',JSON.stringify(payouts));
+      localStorage.setItem('pa6_shipments',JSON.stringify(shipments));
+      localStorage.setItem('pa6_transports',JSON.stringify(transports));
+      localStorage.setItem('pa6_adjustments',JSON.stringify(adjustments));
+      localStorage.setItem('pa6_vacations',JSON.stringify(vacations));
+    }
+    return true;
+  }catch(e){
+    console.error('Supabase load error:',e);
+    return false;
+  }
+}
+
+let saveTimeout=null;
+async function supaSave(){
+  try{
+    const body={
+      id:'main',
+      workers,catalog,projects,orders,reports,payouts,
+      shipments,transports,adjustments,vacations,
+      updated_at:new Date().toISOString()
+    };
+    const res=await fetch(`${SUPA_URL}/rest/v1/scafo_data?id=eq.main`,{
+      method:'PATCH',
+      headers:{
+        'apikey':SUPA_KEY,
+        'Authorization':'Bearer '+SUPA_KEY,
+        'Content-Type':'application/json',
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify(body)
+    });
+    if(!res.ok){
+      // try upsert if patch failed
+      await fetch(`${SUPA_URL}/rest/v1/scafo_data`,{
+        method:'POST',
+        headers:{
+          'apikey':SUPA_KEY,
+          'Authorization':'Bearer '+SUPA_KEY,
+          'Content-Type':'application/json',
+          'Prefer':'resolution=merge-duplicates'
+        },
+        body:JSON.stringify(body)
+      });
+    }
+  }catch(e){
+    console.error('Supabase save error:',e);
+  }
+}
+
 // Migracja danych ze starszych wersji (pa5_... -> pa6_...)
 (function migrate(){
   const keys=['catalog','projects','reports','payouts'];
@@ -885,8 +964,20 @@ function loginManager(){
   show('screen-manager');
 }
 
-function logout(){currentUser=null;recalcOrderStocks();
-showLogin();}
+function logout(){currentUser=null;// Init: load from Supabase, fall back to localStorage
+(async()=>{
+  const el=document.body;
+  const loader=document.createElement('div');
+  loader.id='app-loader';
+  loader.style.cssText='position:fixed;inset:0;background:var(--bg3);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-family:var(--font)';
+  loader.innerHTML='<i class="ti ti-building-factory-2" style="font-size:48px;color:#185FA5;margin-bottom:12px"></i><div style="font-size:16px;font-weight:500;margin-bottom:8px">SCAFO produkcja</div><div style="font-size:13px;color:#888">Ładowanie danych...</div>';
+  document.body.appendChild(loader);
+  const ok=await supaLoad();
+  if(!ok) showToast('Tryb offline — dane lokalne',true);
+  recalcOrderStocks();
+  loader.remove();
+  showLogin();
+})();}
 
 function onTypeChange(){
   const t=document.getElementById('w-type-sel').value;
@@ -2816,6 +2907,7 @@ function importData(event){
       if(data.vacations) vacations=data.vacations;
       recalcOrderStocks();
       save();
+      supaSave().then(()=>showToast('Dane zaimportowane i zsynchronizowane!'));
       renderManager();
       alert('Dane zaimportowane pomyślnie! Pracownicy: '+workers.length+', Produkty: '+catalog.length+', Raporty: '+reports.length);
     } catch(err){
