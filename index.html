@@ -705,31 +705,25 @@ async function supaSave(){
       shipments,transports,adjustments,vacations,
       updated_at:new Date().toISOString()
     };
-    const res=await fetch(`${SUPA_URL}/rest/v1/scafo_data?id=eq.main`,{
-      method:'PATCH',
+    // Always use upsert — works whether row exists or not
+    const res=await fetch(`${SUPA_URL}/rest/v1/scafo_data`,{
+      method:'POST',
       headers:{
         'apikey':SUPA_KEY,
         'Authorization':'Bearer '+SUPA_KEY,
         'Content-Type':'application/json',
-        'Prefer':'return=minimal'
+        'Prefer':'resolution=merge-duplicates,return=minimal'
       },
       body:JSON.stringify(body)
     });
     if(!res.ok){
-      // try upsert if patch failed
-      await fetch(`${SUPA_URL}/rest/v1/scafo_data`,{
-        method:'POST',
-        headers:{
-          'apikey':SUPA_KEY,
-          'Authorization':'Bearer '+SUPA_KEY,
-          'Content-Type':'application/json',
-          'Prefer':'resolution=merge-duplicates'
-        },
-        body:JSON.stringify(body)
-      });
+      const err=await res.text();
+      console.error('Supabase save error:',res.status,err);
+      showToast('Błąd zapisu do chmury: '+res.status,true);
     }
   }catch(e){
     console.error('Supabase save error:',e);
+    showToast('Brak połączenia z chmurą',true);
   }
 }
 
