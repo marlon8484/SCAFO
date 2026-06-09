@@ -233,6 +233,9 @@ textarea{resize:none;height:56px}
     </div>
     <div id="w-earn-summary"></div>
     <div class="divider"></div>
+    <div class="sec-title">Kalendarz zarobków</div>
+    <div id="w-earn-calendar"></div>
+    <div class="divider"></div>
     <div class="sec-title">Historia wypłat</div>
     <div id="w-payouts-list"></div>
   </div>
@@ -1367,6 +1370,151 @@ function renderWorkerToday(){
   }).join('');
 }
 
+function renderWorkerEarningsCalendar(){
+  const el=document.getElementById('w-earn-calendar');
+  if(!el) return;
+
+  // Get all reports for this worker
+  const myReports=reports.filter(r=>r.user===currentUser.name);
+  if(!myReports.length){el.innerHTML='<div style="font-size:13px;color:var(--tx2)">Brak wpisów.</div>';return;}
+
+  // Group by date
+  const byDate={};
+  myReports.forEach(r=>{
+    if(!r.date) return;
+    if(!byDate[r.date]) byDate[r.date]={reps:[],totalEarn:0,totalQty:0};
+    const e=earn(r);
+    byDate[r.date].reps.push(r);
+    byDate[r.date].totalEarn+=e;
+    byDate[r.date].totalQty+=r.qtyDone;
+  });
+
+  // Sort dates descending
+  const sortedDates=Object.keys(byDate).sort((a,b)=>{
+    const pa=a.split('.'),pb=b.split('.');
+    if(pa.length===3&&pb.length===3)
+      return new Date(pb[2],pb[1]-1,pb[0])-new Date(pa[2],pa[1]-1,pa[0]);
+    return b.localeCompare(a);
+  });
+
+  // Calendar nav state
+  const now=new Date();
+  let calY=parseInt(el.dataset.year||now.getFullYear());
+  let calM=parseInt(el.dataset.month||now.getMonth());
+
+  const firstDay=new Date(calY,calM,1);
+  const lastDay=new Date(calY,calM+1,0);
+  const monthName=firstDay.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+  let startDow=firstDay.getDay();
+  if(startDow===0) startDow=7;
+  const days=['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
+
+  // Build calendar cells
+  let cells='';
+  for(let i=1;i<startDow;i++) cells+=`<div style="min-height:52px"></div>`;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=`${d}.${calM+1}.${calY}`;
+    const dayData=byDate[ds];
+    const todayStr=`${now.getDate()}.${now.getMonth()+1}.${now.getFullYear()}`;
+    const isToday=ds===todayStr;
+    let content='';
+    if(dayData){
+      const earnStr=dayData.totalEarn>0?`<div style="font-size:9px;font-weight:500;color:#27500A;white-space:nowrap">${fmt(dayData.totalEarn)} zł</div>`:'';
+      content=`<div style="font-size:9px;color:var(--tx2)">${dayData.totalQty} szt.</div>${earnStr}`;
+    }
+    cells+=`<div onclick="toggleEarnDay('${ds}')"
+      style="min-height:52px;border-radius:var(--rmd);background:${dayData?'#EAF3DE':isToday?'#E6F1FB':'var(--bg2)'};
+      padding:3px;cursor:${dayData?'pointer':'default'};border:1px solid ${isToday?'#185FA5':'transparent'}">
+      <div style="font-size:11px;font-weight:500;color:${isToday?'#185FA5':'var(--tx)'}">${d}</div>
+      ${content}
+    </div>`;
+  }
+
+  // Legend
+  const monthTotal=sortedDates
+    .filter(ds=>{const p=ds.split('.');return p.length===3&&parseInt(p[1])-1===calM&&parseInt(p[2])===calY;})
+    .reduce((a,ds)=>a+byDate[ds].totalEarn,0);
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <button class="btn btn-gray btn-sm" style="margin:0" onclick="earnCalPrev()"><i class="ti ti-chevron-left"></i></button>
+      <div style="font-size:13px;font-weight:500;text-transform:capitalize">${monthName}</div>
+      <button class="btn btn-gray btn-sm" style="margin:0" onclick="earnCalNext()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    ${monthTotal>0?`<div style="font-size:12px;color:#27500A;font-weight:500;text-align:center;margin-bottom:8px;background:#EAF3DE;padding:5px;border-radius:var(--rmd)">Zarobki w tym miesiącu: ${fmt(monthTotal)} zł</div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${days.map(d=>`<div style="text-align:center;font-size:10px;color:var(--tx2);padding:3px 0;font-weight:500">${d}</div>`).join('')}
+      ${cells}
+    </div>
+    <div id="w-earn-day-detail" style="margin-top:8px"></div>
+  `;
+  el.dataset.year=calY;
+  el.dataset.month=calM;
+}
+
+function earnCalPrev(){
+  const el=document.getElementById('w-earn-calendar');
+  if(!el) return;
+  let y=parseInt(el.dataset.year||new Date().getFullYear());
+  let m=parseInt(el.dataset.month||new Date().getMonth());
+  m--;if(m<0){m=11;y--;}
+  el.dataset.year=y;el.dataset.month=m;
+  renderWorkerEarningsCalendar();
+}
+function earnCalNext(){
+  const el=document.getElementById('w-earn-calendar');
+  if(!el) return;
+  let y=parseInt(el.dataset.year||new Date().getFullYear());
+  let m=parseInt(el.dataset.month||new Date().getMonth());
+  m++;if(m>11){m=0;y++;}
+  el.dataset.year=y;el.dataset.month=m;
+  renderWorkerEarningsCalendar();
+}
+
+function toggleEarnDay(ds){
+  const myReports=reports.filter(r=>r.user===currentUser.name&&r.date===ds);
+  if(!myReports.length) return;
+  const el=document.getElementById('w-earn-day-detail');
+  if(!el) return;
+  // Toggle
+  if(el.dataset.date===ds&&el.style.display!=='none'){
+    el.style.display='none';
+    el.dataset.date='';
+    return;
+  }
+  el.dataset.date=ds;
+  el.style.display='block';
+  const totalEarn=myReports.reduce((a,r)=>a+earn(r),0);
+  const totalQty=myReports.reduce((a,r)=>a+r.qtyDone,0);
+  el.innerHTML=`
+    <div class="card" style="padding:10px 14px">
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px">${ds}
+        ${totalEarn>0?`<span style="float:right;color:#27500A">${fmt(totalEarn)} zł</span>`:''}
+      </div>
+      ${myReports.map(r=>{
+        const e=earn(r);
+        return `<div class="ri" style="padding:6px 0">
+          <div class="row">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500">${r.name}</div>
+              <div style="font-size:12px;color:var(--tx2)">
+                <span class="badge ${r.shift==='popołudnie'?'b-purple':'b-gray'}" style="margin-right:4px">${r.shift}</span>
+                ${r.time}${r.hours?` · ${r.hours}h`:''}
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:13px;font-weight:500">${r.qtyDone} szt.</div>
+              ${e>0?`<div style="font-size:12px;color:#27500A;font-weight:500">${fmt(e)} zł</div>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      <div style="font-size:12px;color:var(--tx2);margin-top:6px;padding-top:6px;border-top:0.5px solid var(--bdr)">
+        Łącznie: ${totalQty} szt.${totalEarn>0?` · <span style="color:#27500A;font-weight:500">${fmt(totalEarn)} zł</span>`:''}
+      </div>
+    </div>`;
+}
+
 function renderWorkerEarnings(){
   const period=document.getElementById('w-earn-period')?document.getElementById('w-earn-period').value:'today';
   const ep=earnPeriod(currentUser.name,period);
@@ -1394,6 +1542,15 @@ function renderWorkerPayouts(){
   el.innerHTML=myP.map(p=>`<div class="wr"><div><div style="font-size:13px;font-weight:500">${p.date}</div><div style="font-size:12px;color:var(--tx2)">${p.note||'Wypłata'}</div></div><span style="font-size:15px;font-weight:500;color:#27500A">${fmt(p.amount)} zł</span></div>`).join('');
 }
 
+function toggleWOrderDetail(id){
+  const el=document.getElementById(id);
+  const icon=document.getElementById(id+'-icon');
+  if(!el) return;
+  const isOpen=el.style.display!=='none';
+  el.style.display=isOpen?'none':'block';
+  if(icon) icon.style.transform=isOpen?'':'rotate(180deg)';
+}
+
 function renderWorkerProjects(){
   const el=document.getElementById('w-proj-list');
   const activeOrders=orders.filter(o=>o.status==='active');
@@ -1405,7 +1562,37 @@ function renderWorkerProjects(){
       const done=orderDone(o.id),pp=pct(done,o.target);
       const daysLeft=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/(1000*60*60*24)):null;
       const urgent=daysLeft!==null&&daysLeft<=3;
-      return `<div class="card"><div class="row" style="margin-bottom:4px"><div><div style="font-weight:500;font-size:13px">${o.client}</div><div style="font-size:12px;color:var(--tx2)">${o.name}</div></div><span class="badge ${urgent?'b-red':'b-blue'}">${pp}%</span></div><div class="progress-wrap"><div class="progress-bar" style="width:${pp}%;${urgent?'background:#E24B4A':''}"></div></div><div class="row" style="margin-top:4px"><span style="font-size:12px;color:var(--tx2)">${done} / ${o.target} szt.</span>${o.deadline?`<span style="font-size:12px;${urgent?'color:#E24B4A;font-weight:500':'color:var(--tx2)'}">termin: ${new Date(o.deadline).toLocaleDateString('pl-PL')}</span>`:''}</div></div>`;
+      const items=o.items||[];
+      const itemsHtml=items.map(item=>{
+        const idone=itemDone(o.id,item.catId,item.name);
+        const ip=pct(idone,item.qty);
+        return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:0.5px solid var(--bdr)">
+          <div style="flex:1;font-size:12px">${item.name}</div>
+          <div style="font-size:12px;color:var(--tx2);white-space:nowrap">${idone}/${item.qty} ${item.unit}</div>
+          <div style="width:44px;background:var(--bg2);border-radius:3px;height:5px;overflow:hidden"><div style="height:5px;background:${ip>=100?'#3B6D11':'#185FA5'};width:${Math.min(100,ip)}%"></div></div>
+        </div>`;
+      }).join('');
+      const linkHtml=o.link?`<a href="${o.link}" target="_blank" style="display:flex;align-items:center;gap:4px;font-size:12px;color:#185FA5;margin-top:6px;text-decoration:none"><i class="ti ti-paperclip" style="font-size:13px"></i> Dokumentacja / rysunek</a>`:'';
+      const detailId=`w-order-detail-${o.id}`;
+      return `<div class="card" style="${urgent?'border-color:#E24B4A':''}">
+        <div style="cursor:pointer" onclick="toggleWOrderDetail('${detailId}')">
+          <div class="row" style="margin-bottom:4px">
+            <div style="flex:1"><div style="font-weight:500;font-size:13px">${o.client}</div>
+            ${o.deadline?`<div style="font-size:12px;${urgent?'color:#E24B4A;font-weight:500':'color:var(--tx2)'}">termin: ${new Date(o.deadline).toLocaleDateString('pl-PL')}</div>`:''}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="badge ${urgent?'b-red':'b-blue'}">${pp}%</span>
+              <i class="ti ti-chevron-down" id="${detailId}-icon" style="font-size:15px;color:var(--tx2);transition:transform .2s"></i>
+            </div>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" style="width:${pp}%;${urgent?'background:#E24B4A':''}"></div></div>
+          <div style="font-size:12px;color:var(--tx2);margin-top:3px">${done} / ${o.target} szt.</div>
+        </div>
+        <div id="${detailId}" style="display:none;margin-top:8px;border-top:0.5px solid var(--bdr);padding-top:8px">
+          ${itemsHtml}
+          ${linkHtml}
+        </div>
+      </div>`;
     }).join('');
   }
   if(active.length){
@@ -1424,7 +1611,7 @@ function wTab(tab){
     document.getElementById('wt-tab-'+t).style.display=tab===t?'block':'none';
     document.getElementById('wt-'+t).classList.toggle('act-tab',tab===t);
   });
-  if(tab==='zarobki'){renderWorkerEarnings();renderWorkerPayouts();}
+  if(tab==='zarobki'){renderWorkerEarnings();renderWorkerPayouts();renderWorkerEarningsCalendar();}
   if(tab==='kalendarz') renderCalendarWidget('w-calendar-widget',false);
 }
 
