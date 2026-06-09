@@ -1,4 +1,4 @@
-const CACHE='scafo-v4';
+const CACHE='scafo-v5';
 
 // Only cache static assets, never intercept API calls
 const STATIC=[
