@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<!-- saved from url=(0045)file:///C:/Users/biuro/Downloads/index_5.html -->
-<html lang="pl"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
-
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SCAFO produkcja</title>
-<link rel="stylesheet" href="./index_files/tabler-icons.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com/">
-<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
-<link href="./index_files/css2" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#fff;--bg2:#F5F5F3;--bg3:#EFEFED;
@@ -109,13 +109,13 @@ textarea{resize:none;height:56px}
 .cal-leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx2)}
 .cal-leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
 </style>
-<link rel="manifest" href="file:///C:/Users/biuro/Downloads/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#185FA5">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="SCAFO">
-<link rel="apple-touch-icon" href="file:///C:/Users/biuro/Downloads/icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
 <div id="app">
@@ -126,14 +126,7 @@ textarea{resize:none;height:56px}
     <i class="ti ti-building-factory-2" style="font-size:48px;color:#185FA5;margin-bottom:12px"></i>
     <div style="font-size:22px;font-weight:500;margin-bottom:4px">SCAFO produkcja</div>
     <div style="font-size:13px;color:var(--tx2);margin-bottom:28px">Wybierz użytkownika</div>
-    <div class="worker-select-list" id="worker-list">
-    <button class="worker-btn" onclick="selectWorker(&#39;undefined&#39;)">
-      <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">??</div>
-      <span>undefined</span>
-    </button><button class="worker-btn manager-btn" onclick="selectManager()">
-    <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0;background:var(--bgsuc);color:var(--txsuc)">MG</div>
-    <span>Manager</span>
-  </button></div>
+    <div class="worker-select-list" id="worker-list"></div>
   </div>
 </div>
 
@@ -151,16 +144,16 @@ textarea{resize:none;height:56px}
     </div>
     <div id="pin-error" style="font-size:13px;color:#E24B4A;margin-bottom:12px;min-height:20px"></div>
     <div class="pin-grid">
-      <button class="pin-btn" onclick="pinPress(&#39;1&#39;)">1</button>
-      <button class="pin-btn" onclick="pinPress(&#39;2&#39;)">2</button>
-      <button class="pin-btn" onclick="pinPress(&#39;3&#39;)">3</button>
-      <button class="pin-btn" onclick="pinPress(&#39;4&#39;)">4</button>
-      <button class="pin-btn" onclick="pinPress(&#39;5&#39;)">5</button>
-      <button class="pin-btn" onclick="pinPress(&#39;6&#39;)">6</button>
-      <button class="pin-btn" onclick="pinPress(&#39;7&#39;)">7</button>
-      <button class="pin-btn" onclick="pinPress(&#39;8&#39;)">8</button>
-      <button class="pin-btn" onclick="pinPress(&#39;9&#39;)">9</button>
-      <button class="pin-btn zero" onclick="pinPress(&#39;0&#39;)">0</button>
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn zero" onclick="pinPress('0')">0</button>
       <button class="pin-btn del" onclick="pinDel()"><i class="ti ti-backspace"></i></button>
     </div>
     <button class="btn btn-gray" style="width:auto;padding:8px 20px;margin-top:20px" onclick="showLogin()">
@@ -176,20 +169,20 @@ textarea{resize:none;height:56px}
     <div class="av" id="w-av" onclick="logout()">JK</div>
   </div>
   <div class="tab-bar">
-    <button class="tab act-tab" id="wt-raport" onclick="wTab(&#39;raport&#39;)">Raport</button>
-    <button class="tab" id="wt-zarobki" onclick="wTab(&#39;zarobki&#39;)">Zarobki</button>
-    <button class="tab" id="wt-projekty" onclick="wTab(&#39;projekty&#39;)">Projekty</button>
-    <button class="tab" id="wt-kalendarz" onclick="wTab(&#39;kalendarz&#39;)">Kalendarz</button>
+    <button class="tab act-tab" id="wt-raport" onclick="wTab('raport')">Raport</button>
+    <button class="tab" id="wt-zarobki" onclick="wTab('zarobki')">Zarobki</button>
+    <button class="tab" id="wt-projekty" onclick="wTab('projekty')">Projekty</button>
+    <button class="tab" id="wt-kalendarz" onclick="wTab('kalendarz')">Kalendarz</button>
   </div>
   <div id="wt-tab-raport">
     <div class="card">
       <div style="font-size:13px;font-weight:500;margin-bottom:12px">Nowy wpis pracy</div>
       <div class="lbl">Data wpisu</div>
-      <input type="date" id="w-entry-date" onchange="renderWorkerToday()">
+      <input type="date" id="w-entry-date" onchange="renderWorkerToday()" />
       <div class="lbl">Zmiana</div>
       <select id="w-shift" onchange="onShiftChange()"><option value="rano">Rano</option><option value="popołudnie">Popołudnie (akord)</option></select>
       <div class="lbl">Czas pracy (godz.) — opcjonalne</div>
-      <input type="number" id="w-hours" placeholder="np. 8" min="0" step="0.5" inputmode="decimal">
+      <input type="number" id="w-hours" placeholder="np. 8" min="0" step="0.5" inputmode="decimal" />
       <div class="lbl">Uwagi do całego wpisu</div>
       <textarea id="w-notes" placeholder="opcjonalne..."></textarea>
       <div style="font-size:13px;font-weight:500;margin:4px 0 8px">Lista zadań</div>
@@ -219,10 +212,10 @@ textarea{resize:none;height:56px}
       </div>
       <div id="w-custom-row" style="display:none">
         <div class="lbl">Nazwa zadania</div>
-        <input type="text" id="w-custom-name" placeholder="np. Czyszczenie linii">
+        <input type="text" id="w-custom-name" placeholder="np. Czyszczenie linii" />
       </div>
       <div class="lbl">Ilość (szt.)</div>
-      <input type="number" id="w-qty" placeholder="np. 20" min="0" inputmode="numeric">
+      <input type="number" id="w-qty" placeholder="np. 20" min="0" inputmode="numeric" />
       <button class="btn btn-gray" style="margin-bottom:8px" onclick="addWItem()"><i class="ti ti-plus"></i> Dodaj do listy</button>
       <button class="btn btn-blue" onclick="workerSave()"><i class="ti ti-device-floppy"></i> Zapisz cały wpis</button>
     </div>
@@ -266,16 +259,16 @@ textarea{resize:none;height:56px}
     <div class="av" id="pw-av" onclick="logout()">JK</div>
   </div>
   <div class="tab-bar">
-    <button class="tab act-tab" id="pwt-raport" onclick="pwTab(&#39;raport&#39;)">Raport</button>
-    <button class="tab" id="pwt-zarobki" onclick="pwTab(&#39;zarobki&#39;)">Zarobki</button>
-    <button class="tab" id="pwt-kalendarz" onclick="pwTab(&#39;kalendarz&#39;)">Kalendarz</button>
+    <button class="tab act-tab" id="pwt-raport" onclick="pwTab('raport')">Raport</button>
+    <button class="tab" id="pwt-zarobki" onclick="pwTab('zarobki')">Zarobki</button>
+    <button class="tab" id="pwt-kalendarz" onclick="pwTab('kalendarz')">Kalendarz</button>
   </div>
 
   <div id="pwt-tab-raport">
     <div class="card">
       <div style="font-size:13px;font-weight:500;margin-bottom:12px">Nowy wpis pracy</div>
       <div class="lbl">Data wpisu</div>
-      <input type="date" id="pw-entry-date" onchange="renderPwToday()">
+      <input type="date" id="pw-entry-date" onchange="renderPwToday()" />
       <div class="lbl">Zmiana</div>
       <select id="pw-shift"><option value="popołudnie">Popołudnie (akord)</option><option value="rano">Rano</option></select>
       <div class="lbl">Zadanie</div>
@@ -286,7 +279,7 @@ textarea{resize:none;height:56px}
         <i class="ti ti-coin" style="font-size:13px;vertical-align:-1px"></i> Stawka: <span id="pw-rate-val"></span> zł/szt.
       </div>
       <div class="lbl">Ilość wykonana (szt.)</div>
-      <input type="number" id="pw-qty" placeholder="np. 50" min="0" inputmode="numeric">
+      <input type="number" id="pw-qty" placeholder="np. 50" min="0" inputmode="numeric" />
       <div class="lbl">Uwagi (opcjonalne)</div>
       <textarea id="pw-notes" placeholder="opcjonalne..."></textarea>
       <button class="btn btn-blue" onclick="pwSave()"><i class="ti ti-device-floppy"></i> Zapisz wpis</button>
@@ -323,7 +316,7 @@ textarea{resize:none;height:56px}
 <!-- EKRAN WYDANIA TOWARU (pracownik) -->
 <div id="screen-shipment" class="screen">
   <div class="topbar">
-    <button class="btn btn-gray btn-sm" style="margin:0" onclick="show(&#39;screen-worker&#39;)"><i class="ti ti-arrow-left"></i> Wróć</button>
+    <button class="btn btn-gray btn-sm" style="margin:0" onclick="show('screen-worker')"><i class="ti ti-arrow-left"></i> Wróć</button>
     <h2>Wydaj towar</h2>
     <div style="width:32px"></div>
   </div>
@@ -335,7 +328,7 @@ textarea{resize:none;height:56px}
     <div id="sh-items-list"></div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <select id="sh-item-prod" style="flex:1;margin:0"><option value="">— produkt —</option></select>
-      <input type="number" id="sh-item-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0">
+      <input type="number" id="sh-item-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0" />
       <button class="btn btn-gray btn-sm" onclick="addShipmentItem()"><i class="ti ti-plus"></i></button>
     </div>
     <div class="lbl">Uwagi</div>
@@ -351,11 +344,11 @@ textarea{resize:none;height:56px}
     <div class="av" style="background:var(--bgsuc);color:var(--txsuc)" onclick="logout()">MG</div>
   </div>
   <div class="tab-bar">
-    <button class="tab act-tab" id="mt-wyplaty" onclick="mTab(&#39;wyplaty&#39;)">Wypłaty</button>
-    <button class="tab" id="mt-raporty" onclick="mTab(&#39;raporty&#39;)">Raporty</button>
-    <button class="tab" id="mt-mag" onclick="mTab(&#39;mag&#39;)">Magazyn</button>
-    <button class="tab" id="mt-zam" onclick="mTab(&#39;zam&#39;)">Zamówienia</button>
-    <button class="tab" id="mt-ust" onclick="mTab(&#39;ust&#39;)">Ustawienia</button>
+    <button class="tab act-tab" id="mt-wyplaty" onclick="mTab('wyplaty')">Wypłaty</button>
+    <button class="tab" id="mt-raporty" onclick="mTab('raporty')">Raporty</button>
+    <button class="tab" id="mt-mag" onclick="mTab('mag')">Magazyn</button>
+    <button class="tab" id="mt-zam" onclick="mTab('zam')">Zamówienia</button>
+    <button class="tab" id="mt-ust" onclick="mTab('ust')">Ustawienia</button>
   </div>
   <div id="mt-tab-wyplaty">
     <div class="stat-grid">
@@ -371,17 +364,17 @@ textarea{resize:none;height:56px}
   <div id="mt-tab-raporty" style="display:none">
     <div class="card" style="margin-bottom:10px">
       <div class="lbl">Filtruj dzień</div>
-      <input type="date" id="mg-date" onchange="renderMgReports()">
+      <input type="date" id="mg-date" onchange="renderMgReports()" />
     </div>
     <div id="mg-reports"></div>
   </div>
   <div id="mt-tab-mag" style="display:none">
     <div class="tab-bar">
-      <button class="tab act-tab" id="magt-stan" onclick="magTab(&#39;stan&#39;)">Stan</button>
-      <button class="tab" id="magt-kalendarz" onclick="magTab(&#39;kalendarz&#39;)">Kalendarz</button>
-      <button class="tab" id="magt-wydania" onclick="magTab(&#39;wydania&#39;)">Wydania</button>
-      <button class="tab" id="magt-korekty" onclick="magTab(&#39;korekty&#39;)">Korekty</button>
-      <button class="tab" id="magt-kal" onclick="magTab(&#39;kal&#39;)">Kalendarz</button>
+      <button class="tab act-tab" id="magt-stan" onclick="magTab('stan')">Stan</button>
+      <button class="tab" id="magt-kalendarz" onclick="magTab('kalendarz')">Kalendarz</button>
+      <button class="tab" id="magt-wydania" onclick="magTab('wydania')">Wydania</button>
+      <button class="tab" id="magt-korekty" onclick="magTab('korekty')">Korekty</button>
+      <button class="tab" id="magt-kal" onclick="magTab('kal')">Kalendarz</button>
     </div>
     <div id="magt-tab-stan">
       <div class="sec-title">Stan magazynu</div>
@@ -394,14 +387,14 @@ textarea{resize:none;height:56px}
       <div style="font-size:13px;font-weight:500;margin-bottom:12px">Zaplanuj transport</div>
       <div class="card">
         <div class="lbl">Data transportu</div>
-        <input type="date" id="tr-date">
+        <input type="date" id="tr-date" />
         <div class="lbl">Klient / zamówienie</div>
         <select id="tr-order"><option value="">— wybierz zamówienie —</option></select>
         <div style="font-size:13px;font-weight:500;margin:8px 0 8px">Produkty w transporcie</div>
         <div id="tr-items-list"></div>
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <select id="tr-item-prod" style="flex:1;margin:0"><option value="">— produkt —</option></select>
-          <input type="number" id="tr-item-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0">
+          <input type="number" id="tr-item-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0" />
           <button class="btn btn-gray btn-sm" onclick="addTransportItem()"><i class="ti ti-plus"></i></button>
         </div>
         <div class="lbl">Uwagi (opcjonalne)</div>
@@ -421,7 +414,7 @@ textarea{resize:none;height:56px}
           <div id="mg-sh-items-list"></div>
           <div style="display:flex;gap:8px;margin-bottom:10px">
             <select id="mg-sh-item-prod" style="flex:1;margin:0"><option value="">— produkt —</option></select>
-            <input type="number" id="mg-sh-item-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0">
+            <input type="number" id="mg-sh-item-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0" />
             <button class="btn btn-gray btn-sm" onclick="addMgrShipmentItem()"><i class="ti ti-plus"></i></button>
           </div>
           <div class="lbl">Uwagi</div>
@@ -458,14 +451,14 @@ textarea{resize:none;height:56px}
         </select>
         <div id="adj-custom-row" style="display:none">
           <div class="lbl">Lub wpisz własną nazwę</div>
-          <input type="text" id="adj-custom-name" placeholder="np. Cement workowany">
+          <input type="text" id="adj-custom-name" placeholder="np. Cement workowany" />
         </div>
         <div class="lbl">Ilość (szt. / mb / kg)</div>
-        <input type="number" id="adj-qty" placeholder="np. 50" min="1" inputmode="numeric">
+        <input type="number" id="adj-qty" placeholder="np. 50" min="1" inputmode="numeric" />
         <div class="lbl">Data</div>
-        <input type="date" id="adj-date">
+        <input type="date" id="adj-date" />
         <div class="lbl">Uwagi (opcjonalne)</div>
-        <input type="text" id="adj-notes" placeholder="np. faktura 12/2026, dostawca X">
+        <input type="text" id="adj-notes" placeholder="np. faktura 12/2026, dostawca X" />
         <button class="btn btn-blue" onclick="addAdjustment()"><i class="ti ti-adjustments"></i> Zapisz korektę</button>
       </div>
     </div>
@@ -477,9 +470,9 @@ textarea{resize:none;height:56px}
   <div style="font-size:13px;font-weight:500;margin-bottom:12px">Dodaj nowe zamówienie</div>
   <div class="card">
     <div class="lbl">Klient</div>
-    <input type="text" id="no-client" placeholder="np. Firma ABC">
+    <input type="text" id="no-client" placeholder="np. Firma ABC" />
     <div class="lbl">Termin realizacji</div>
-    <input type="date" id="no-deadline">
+    <input type="date" id="no-deadline" />
     <div style="font-size:13px;font-weight:500;margin-bottom:8px;margin-top:4px">Produkty w zamówieniu</div>
     <div id="no-items-list"></div>
     <div style="display:flex;gap:8px;margin-bottom:6px">
@@ -488,11 +481,11 @@ textarea{resize:none;height:56px}
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <div style="flex:1">
         <div style="font-size:11px;color:var(--tx2);margin-bottom:2px">Ilość zamówiona</div>
-        <input type="number" id="no-item-qty" placeholder="szt." min="1" inputmode="numeric" style="margin:0" onchange="updateNoItemShortfall()" oninput="updateNoItemShortfall()">
+        <input type="number" id="no-item-qty" placeholder="szt." min="1" inputmode="numeric" style="margin:0" onchange="updateNoItemShortfall()" oninput="updateNoItemShortfall()" />
       </div>
       <div style="flex:1">
         <div style="font-size:11px;color:var(--tx2);margin-bottom:2px">Już na magazynie</div>
-        <input type="number" id="no-item-stock" placeholder="0" min="0" inputmode="numeric" style="margin:0" onchange="updateNoItemShortfall()" oninput="updateNoItemShortfall()">
+        <input type="number" id="no-item-stock" placeholder="0" min="0" inputmode="numeric" style="margin:0" onchange="updateNoItemShortfall()" oninput="updateNoItemShortfall()" />
       </div>
       <div style="display:flex;align-items:flex-end;padding-bottom:0">
         <button class="btn btn-gray btn-sm" onclick="addOrderItem()"><i class="ti ti-plus"></i></button>
@@ -502,36 +495,36 @@ textarea{resize:none;height:56px}
     <div id="no-item-shortfall" style="font-size:12px;font-weight:500;margin-bottom:10px;display:none"></div>
     <div class="lbl">Własny produkt (jeśli brak w katalogu)</div>
     <div style="display:flex;gap:8px;margin-bottom:6px">
-      <input type="text" id="no-item-custom" placeholder="np. Słupek betonowy" style="flex:1;margin:0">
+      <input type="text" id="no-item-custom" placeholder="np. Słupek betonowy" style="flex:1;margin:0" />
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <div style="flex:1">
         <div style="font-size:11px;color:var(--tx2);margin-bottom:2px">Ilość zamówiona</div>
-        <input type="number" id="no-item-custom-qty" placeholder="szt." min="1" inputmode="numeric" style="margin:0">
+        <input type="number" id="no-item-custom-qty" placeholder="szt." min="1" inputmode="numeric" style="margin:0" />
       </div>
       <div style="flex:1">
         <div style="font-size:11px;color:var(--tx2);margin-bottom:2px">Już na magazynie</div>
-        <input type="number" id="no-item-custom-stock" placeholder="0" min="0" inputmode="numeric" style="margin:0">
+        <input type="number" id="no-item-custom-stock" placeholder="0" min="0" inputmode="numeric" style="margin:0" />
       </div>
       <div style="display:flex;align-items:flex-end;padding-bottom:0">
         <button class="btn btn-gray btn-sm" onclick="addOrderItemCustom()"><i class="ti ti-plus"></i></button>
       </div>
     </div>
     <div class="lbl" style="margin-top:8px">Link do projektu / dokumentacji (opcjonalne)</div>
-    <input type="url" id="no-link" placeholder="np. https://drive.google.com/...">
+    <input type="url" id="no-link" placeholder="np. https://drive.google.com/..." />
     <button class="btn btn-blue" onclick="addOrder()"><i class="ti ti-plus"></i> Utwórz zamówienie</button>
   </div>
 </div>
 <div id="mt-tab-ust" style="display:none">
     <div class="tab-bar">
-      <button class="tab act-tab" id="ut-prac" onclick="uTab(&#39;prac&#39;)">Pracownicy</button>
-      <button class="tab" id="ut-stawki" onclick="uTab(&#39;stawki&#39;)">Stawki</button>
-      <button class="tab" id="ut-prod" onclick="uTab(&#39;prod&#39;)">Produkty</button>
+      <button class="tab act-tab" id="ut-prac" onclick="uTab('prac')">Pracownicy</button>
+      <button class="tab" id="ut-stawki" onclick="uTab('stawki')">Stawki</button>
+      <button class="tab" id="ut-prod" onclick="uTab('prod')">Produkty</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button class="btn btn-gray" style="flex:1;margin:0" onclick="exportData()"><i class="ti ti-download"></i> Eksport danych</button>
-      <button class="btn btn-gray" style="flex:1;margin:0" onclick="document.getElementById(&#39;import-file&#39;).click()"><i class="ti ti-upload"></i> Import danych</button>
-      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+      <button class="btn btn-gray" style="flex:1;margin:0" onclick="document.getElementById('import-file').click()"><i class="ti ti-upload"></i> Import danych</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)" />
     </div>
     <div id="ut-tab-prac">
       <div class="sec-title">Zarządzaj pracownikami</div>
@@ -540,9 +533,9 @@ textarea{resize:none;height:56px}
       <div style="font-size:13px;font-weight:500;margin-bottom:12px">Dodaj nowego pracownika</div>
       <div class="card">
         <div class="lbl">Imię i nazwisko</div>
-        <input type="text" id="nw-name" placeholder="np. Marek Nowak">
+        <input type="text" id="nw-name" placeholder="np. Marek Nowak" />
         <div class="lbl">PIN (4 cyfry)</div>
-        <input type="text" id="nw-pin" placeholder="np. 1234" maxlength="4" inputmode="numeric" pattern="[0-9]{4}">
+        <input type="text" id="nw-pin" placeholder="np. 1234" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" />
         <div class="lbl">Typ konta</div>
         <select id="nw-role">
           <option value="full">Pełny dostęp</option>
@@ -550,7 +543,7 @@ textarea{resize:none;height:56px}
         </select>
         <div class="lbl">Harmonogram wypłat</div>
         <select id="nw-sched">
-          <option value="Co tydzień" selected="">Co tydzień</option>
+          <option value="Co tydzień" selected>Co tydzień</option>
           <option value="Co dwa tygodnie">Co dwa tygodnie</option>
           <option value="Co miesiąc">Co miesiąc</option>
         </select>
@@ -568,18 +561,20 @@ textarea{resize:none;height:56px}
       <div style="font-size:13px;font-weight:500;margin-bottom:12px">Dodaj nowy produkt</div>
       <div class="card">
         <div class="lbl">Nazwa produktu</div>
-        <input type="text" id="nc-name" placeholder="np. Podkładka betonowa typ B">
+        <input type="text" id="nc-name" placeholder="np. Podkładka betonowa typ B" />
         <div class="lbl">Jednostka</div>
         <select id="nc-unit"><option value="szt.">szt.</option><option value="mb">mb</option><option value="m²">m²</option><option value="kg">kg</option></select>
         <div class="lbl">Stawka akordowa (zł/szt.)</div>
-        <input type="number" id="nc-rate" placeholder="np. 1.50" min="0" step="0.01" inputmode="decimal">
+        <input type="number" id="nc-rate" placeholder="np. 1.50" min="0" step="0.01" inputmode="decimal" />
         <div style="margin-bottom:12px">
           <div style="font-size:12px;color:var(--tx2);margin-bottom:6px">Wchodzi na magazyn</div>
           <div style="display:flex;gap:8px">
-            <button type="button" id="nc-stock-yes" onclick="setStockBtn(true)" style="flex:1;padding:10px;border-radius:var(--rmd);border:1.5px solid #185FA5;background:#E6F1FB;color:#0C447C;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer">
+            <button type="button" id="nc-stock-yes" onclick="setStockBtn(true)"
+              style="flex:1;padding:10px;border-radius:var(--rmd);border:1.5px solid #185FA5;background:#E6F1FB;color:#0C447C;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer">
               <i class="ti ti-building-warehouse"></i> Tak — magazyn
             </button>
-            <button type="button" id="nc-stock-no" onclick="setStockBtn(false)" style="flex:1;padding:10px;border-radius:var(--rmd);border:1.5px solid var(--bdr2);background:var(--bg2);color:var(--tx2);font-family:var(--font);font-size:13px;cursor:pointer">
+            <button type="button" id="nc-stock-no" onclick="setStockBtn(false)"
+              style="flex:1;padding:10px;border-radius:var(--rmd);border:1.5px solid var(--bdr2);background:var(--bg2);color:var(--tx2);font-family:var(--font);font-size:13px;cursor:pointer">
               <i class="ti ti-tool"></i> Nie — etap produkcji
             </button>
           </div>
@@ -593,11 +588,11 @@ textarea{resize:none;height:56px}
       <div style="font-size:13px;font-weight:500;margin-bottom:12px">Dodaj nowy projekt</div>
       <div class="card">
         <div class="lbl">Nazwa projektu</div>
-        <input type="text" id="np-name" placeholder="np. Progi betonowe seria B">
+        <input type="text" id="np-name" placeholder="np. Progi betonowe seria B" />
         <div class="lbl">Cel (szt.)</div>
-        <input type="number" id="np-target" placeholder="np. 400" min="1" inputmode="numeric">
+        <input type="number" id="np-target" placeholder="np. 400" min="1" inputmode="numeric" />
         <div class="lbl">Stawka akordowa (zł/szt.)</div>
-        <input type="number" id="np-rate" placeholder="np. 2.00" min="0" step="0.01" inputmode="decimal">
+        <input type="number" id="np-rate" placeholder="np. 2.00" min="0" step="0.01" inputmode="decimal" />
         <button class="btn btn-blue" onclick="addProject()"><i class="ti ti-plus"></i> Utwórz projekt</button>
       </div>
     </div>
@@ -608,11 +603,11 @@ textarea{resize:none;height:56px}
     </button>
   </div>
   <div class="nav-bar">
-    <button class="nav-btn act" id="mn-wyplaty" onclick="mTab(&#39;wyplaty&#39;)"><i class="ti ti-cash"></i>Wypłaty</button>
-    <button class="nav-btn" id="mn-raporty" onclick="mTab(&#39;raporty&#39;)"><i class="ti ti-chart-bar"></i>Raporty</button>
-    <button class="nav-btn" id="mn-mag" onclick="mTab(&#39;mag&#39;)"><i class="ti ti-building-warehouse"></i>Magazyn</button>
-    <button class="nav-btn" id="mn-zam" onclick="mTab(&#39;zam&#39;)"><i class="ti ti-clipboard-list"></i>Zamówienia</button>
-    <button class="nav-btn" id="mn-ust" onclick="mTab(&#39;ust&#39;)"><i class="ti ti-settings"></i>Ustawienia</button>
+    <button class="nav-btn act" id="mn-wyplaty" onclick="mTab('wyplaty')"><i class="ti ti-cash"></i>Wypłaty</button>
+    <button class="nav-btn" id="mn-raporty" onclick="mTab('raporty')"><i class="ti ti-chart-bar"></i>Raporty</button>
+    <button class="nav-btn" id="mn-mag" onclick="mTab('mag')"><i class="ti ti-building-warehouse"></i>Magazyn</button>
+    <button class="nav-btn" id="mn-zam" onclick="mTab('zam')"><i class="ti ti-clipboard-list"></i>Zamówienia</button>
+    <button class="nav-btn" id="mn-ust" onclick="mTab('ust')"><i class="ti ti-settings"></i>Ustawienia</button>
   </div>
 </div>
 
@@ -643,18 +638,18 @@ textarea{resize:none;height:56px}
   <div style="background:var(--bg);border-radius:var(--rlg);padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto">
     <div style="font-size:16px;font-weight:500;margin-bottom:16px">Edytuj wpis</div>
     <div class="lbl">Nazwa / zadanie</div>
-    <input type="text" id="edit-name" placeholder="Nazwa zadania">
+    <input type="text" id="edit-name" placeholder="Nazwa zadania" />
     <div class="lbl">Ilość (szt.)</div>
-    <input type="number" id="edit-qty" min="1" inputmode="numeric">
+    <input type="number" id="edit-qty" min="1" inputmode="numeric" />
     <div class="lbl">Zmiana</div>
     <select id="edit-shift">
       <option value="rano">Rano</option>
       <option value="popołudnie">Popołudnie (akord)</option>
     </select>
     <div class="lbl">Data wpisu</div>
-    <input type="date" id="edit-date">
+    <input type="date" id="edit-date" />
     <div class="lbl">Czas pracy (godz.)</div>
-    <input type="number" id="edit-hours" min="0" step="0.5" inputmode="decimal">
+    <input type="number" id="edit-hours" min="0" step="0.5" inputmode="decimal" />
     <div class="lbl">Uwagi</div>
     <textarea id="edit-notes" style="height:56px;resize:none"></textarea>
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -3207,6 +3202,5 @@ if("serviceWorker"in navigator){
     if(e.data&&e.data.type==='RELOAD') window.location.reload();
   });
 }</script>
-
-
-</body></html>
+</body>
+</html>
