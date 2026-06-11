@@ -428,6 +428,9 @@ textarea{resize:none;height:56px}
     </div>
     <div id="mg-reports"></div>
   </div>
+  <div id="mt-tab-rapkal" style="display:none">
+    <div id="mg-rep-calendar-widget"></div>
+  </div>
   <div id="mt-tab-mag" style="display:none">
     <div class="tab-bar">
       <button class="tab act-tab" id="magt-stan" onclick="magTab('stan')">Stan</button>
@@ -1847,6 +1850,153 @@ function addMgrRepItem(){
   document.getElementById('mgr-rep-qty').value='';
   ['mgr-rep-catalog-row','mgr-rep-order-row','mgr-rep-project-row','mgr-rep-custom-row'].forEach(id=>document.getElementById(id).style.display='none');
   renderMgrRepItems();
+}
+
+function renderMgrReportCalendar(){
+  const el=document.getElementById('mg-rep-calendar-widget');
+  if(!el) return;
+
+  const now=new Date();
+  let calY=parseInt(el.dataset.year||now.getFullYear());
+  let calM=parseInt(el.dataset.month||now.getMonth());
+
+  // Group reports by date and worker
+  const byDate={};
+  reports.forEach(r=>{
+    if(!r.date) return;
+    if(!byDate[r.date]) byDate[r.date]={workers:new Set(),totalQty:0,reps:[]};
+    byDate[r.date].workers.add(r.user);
+    byDate[r.date].totalQty+=r.qtyDone;
+    byDate[r.date].reps.push(r);
+  });
+
+  const firstDay=new Date(calY,calM,1);
+  const lastDay=new Date(calY,calM+1,0);
+  const monthName=firstDay.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+  let startDow=firstDay.getDay();
+  if(startDow===0) startDow=7;
+  const days=['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
+
+  let cells='';
+  for(let i=1;i<startDow;i++) cells+=`<div style="min-height:56px"></div>`;
+
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=`${d}.${String(calM+1).padStart(2,'0')}.${calY}`;
+    const dayData=byDate[ds];
+    const todayStr=`${now.getDate()}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`;
+    const isToday=ds===todayStr;
+    let content='';
+    if(dayData){
+      const wCount=dayData.workers.size;
+      content=`<div style="font-size:9px;color:var(--tx2)">${dayData.totalQty} szt.</div>
+               <div style="font-size:9px;color:#185FA5">${wCount} prac.</div>`;
+    }
+    cells+=`<div onclick="toggleMgrRepDay('${ds}')"
+      style="min-height:56px;border-radius:var(--rmd);
+      background:${dayData?'#E6F1FB':isToday?'#EAF3DE':'var(--bg2)'};
+      padding:3px;cursor:${dayData?'pointer':'default'};
+      border:1px solid ${isToday?'#185FA5':'transparent'}">
+      <div style="font-size:11px;font-weight:500;color:${isToday?'#185FA5':'var(--tx)'}">${d}</div>
+      ${content}
+    </div>`;
+  }
+
+  // Month summary
+  const monthDates=Object.keys(byDate).filter(ds=>{
+    const p=ds.split('.');
+    return p.length===3&&parseInt(p[1])-1===calM&&parseInt(p[2])===calY;
+  });
+  const monthQty=monthDates.reduce((a,ds)=>a+byDate[ds].totalQty,0);
+  const monthWorkers=new Set(monthDates.flatMap(ds=>Array.from(byDate[ds].workers)));
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <button class="btn btn-gray btn-sm" style="margin:0" onclick="mgrRepCalPrev()"><i class="ti ti-chevron-left"></i></button>
+      <div style="font-size:13px;font-weight:500;text-transform:capitalize">${monthName}</div>
+      <button class="btn btn-gray btn-sm" style="margin:0" onclick="mgrRepCalNext()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    ${monthQty>0?`<div style="display:flex;gap:8px;margin-bottom:8px">
+      <div style="flex:1;background:#E6F1FB;border-radius:var(--rmd);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#185FA5">${monthQty}</div>
+        <div style="font-size:11px;color:var(--tx2)">szt. w miesiącu</div>
+      </div>
+      <div style="flex:1;background:#EAF3DE;border-radius:var(--rmd);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#3B6D11">${monthDates.length}</div>
+        <div style="font-size:11px;color:var(--tx2)">dni z raportami</div>
+      </div>
+      <div style="flex:1;background:#FAEEDA;border-radius:var(--rmd);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#633806">${monthWorkers.size}</div>
+        <div style="font-size:11px;color:var(--tx2)">pracowników</div>
+      </div>
+    </div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${days.map(d=>`<div style="text-align:center;font-size:10px;color:var(--tx2);padding:3px 0;font-weight:500">${d}</div>`).join('')}
+      ${cells}
+    </div>
+    <div id="mgr-rep-day-detail" style="display:none;margin-top:8px"></div>
+  `;
+  el.dataset.year=calY;
+  el.dataset.month=calM;
+}
+
+function mgrRepCalPrev(){
+  const el=document.getElementById('mg-rep-calendar-widget');
+  if(!el) return;
+  let y=parseInt(el.dataset.year||new Date().getFullYear());
+  let m=parseInt(el.dataset.month||new Date().getMonth());
+  m--;if(m<0){m=11;y--;}
+  el.dataset.year=y;el.dataset.month=m;
+  renderMgrReportCalendar();
+}
+function mgrRepCalNext(){
+  const el=document.getElementById('mg-rep-calendar-widget');
+  if(!el) return;
+  let y=parseInt(el.dataset.year||new Date().getFullYear());
+  let m=parseInt(el.dataset.month||new Date().getMonth());
+  m++;if(m>11){m=0;y++;}
+  el.dataset.year=y;el.dataset.month=m;
+  renderMgrReportCalendar();
+}
+
+function toggleMgrRepDay(ds){
+  const el=document.getElementById('mgr-rep-day-detail');
+  if(!el) return;
+  const dayReps=reports.filter(r=>r.date===ds);
+  if(!dayReps.length) return;
+  if(el.dataset.date===ds&&el.style.display!=='none'){
+    el.style.display='none';el.dataset.date='';return;
+  }
+  el.dataset.date=ds;el.style.display='block';
+
+  // Group by worker
+  const byW={};
+  dayReps.forEach(r=>{
+    if(!byW[r.user]) byW[r.user]=[];
+    byW[r.user].push(r);
+  });
+
+  el.innerHTML=`<div class="card" style="padding:10px 14px">
+    <div style="font-size:13px;font-weight:500;margin-bottom:10px">${ds}</div>
+    ${Object.entries(byW).map(([w,reps])=>{
+      const tq=reps.reduce((a,r)=>a+r.qtyDone,0);
+      const te=reps.reduce((a,r)=>a+earn(r),0);
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div class="av" style="width:24px;height:24px;font-size:10px">${initials(w)}</div>
+          <div style="flex:1;font-size:13px;font-weight:500">${w}</div>
+          <div style="text-align:right;font-size:12px">
+            <div style="font-weight:500">${tq} szt.</div>
+            ${te>0?`<div style="color:#27500A">${fmt(te)} zł</div>`:''}
+          </div>
+        </div>
+        ${reps.map(r=>{const e=earn(r);return `<div style="font-size:12px;padding:4px 0 4px 32px;border-bottom:0.5px solid var(--bdr)">
+          <span style="font-weight:500">${r.name}</span> · ${r.qtyDone} szt.
+          <span class="badge ${r.shift==='popołudnie'?'b-purple':'b-gray'}" style="margin-left:4px">${r.shift}</span>
+          ${e>0?`<span style="color:#27500A;margin-left:4px">${fmt(e)} zł</span>`:''}
+        </div>`;}).join('')}
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function toggleMgrAddReport(){
@@ -3338,7 +3488,9 @@ function magTab(tab){
   if(tab==='kalendarz') renderMgCalendar();
   if(tab==='wydania') renderMgShipments();
   if(tab==='korekty') renderMgAdjustments();
+  if(tab==='rapkal') renderMgrReportCalendar();
   if(tab==='kal') renderCalendarWidget('mg-calendar-widget',true);
+  if(tab==='rapkal') renderMgrReportCalendar();
 }
 
 const ADJ_LABELS={opening:'Bilans otwarcia',purchase:'Zakup',correction_plus:'Korekta +',correction_minus:'Korekta −',sale:'Sprzedaż'};
