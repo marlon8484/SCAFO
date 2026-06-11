@@ -1416,9 +1416,9 @@ function renderWorkerEarningsCalendar(){
   let cells='';
   for(let i=1;i<startDow;i++) cells+=`<div style="min-height:52px"></div>`;
   for(let d=1;d<=lastDay.getDate();d++){
-    const ds=`${d}.${calM+1}.${calY}`;
+    const ds=`${d}.${String(calM+1).padStart(2,'0')}.${calY}`;
     const dayData=byDate[ds];
-    const todayStr=`${now.getDate()}.${now.getMonth()+1}.${now.getFullYear()}`;
+    const todayStr=`${now.getDate()}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`;
     const isToday=ds===todayStr;
     let content='';
     if(dayData){
@@ -2534,9 +2534,9 @@ function renderPwEarningsCalendar(){
   let cells='';
   for(let i=1;i<startDow;i++) cells+=`<div style="min-height:52px"></div>`;
   for(let d=1;d<=lastDay.getDate();d++){
-    const ds=`${d}.${calM+1}.${calY}`;
+    const ds=`${d}.${String(calM+1).padStart(2,'0')}.${calY}`;
     const dayData=byDate[ds];
-    const todayStr=`${now.getDate()}.${now.getMonth()+1}.${now.getFullYear()}`;
+    const todayStr=`${now.getDate()}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`;
     const isToday=ds===todayStr;
     let content='';
     if(dayData){
