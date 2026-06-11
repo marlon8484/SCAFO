@@ -378,9 +378,16 @@ textarea{resize:none;height:56px}
           <option value="rano">Rano</option>
           <option value="popołudnie">Popołudnie (akord)</option>
         </select>
+        <div class="lbl">Czas pracy (godz.) — opcjonalne</div>
+        <input type="number" id="mgr-rep-hours" min="0" step="0.5" inputmode="decimal" />
+        <div class="lbl">Uwagi do całego wpisu</div>
+        <textarea id="mgr-rep-notes" placeholder="opcjonalne..."></textarea>
+        <div style="font-size:13px;font-weight:500;margin:4px 0 8px">Lista zadań</div>
+        <div id="mgr-rep-items-list"></div>
+        <div class="divider"></div>
         <div class="lbl">Typ zadania</div>
         <select id="mgr-rep-type" onchange="onMgrRepTypeChange()">
-          <option value="">— wybierz —</option>
+          <option value="">— wybierz typ —</option>
           <option value="catalog">Produkt z katalogu</option>
           <option value="order">Zamówienie klienta</option>
           <option value="project">Projekt długoterminowy</option>
@@ -408,12 +415,9 @@ textarea{resize:none;height:56px}
         </div>
         <div class="lbl">Ilość (szt.)</div>
         <input type="number" id="mgr-rep-qty" min="1" inputmode="numeric" />
-        <div class="lbl">Czas pracy (godz.) — opcjonalne</div>
-        <input type="number" id="mgr-rep-hours" min="0" step="0.5" inputmode="decimal" />
-        <div class="lbl">Uwagi</div>
-        <textarea id="mgr-rep-notes" placeholder="opcjonalne..."></textarea>
+        <button class="btn btn-gray" style="margin-bottom:8px" onclick="addMgrRepItem()"><i class="ti ti-plus"></i> Dodaj do listy</button>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-blue" style="flex:1;margin:0" onclick="saveMgrReport()"><i class="ti ti-check"></i> Zapisz</button>
+          <button class="btn btn-blue" style="flex:1;margin:0" onclick="saveMgrReport()"><i class="ti ti-device-floppy"></i> Zapisz cały wpis</button>
           <button class="btn btn-gray" style="flex:1;margin:0" onclick="toggleMgrAddReport()">Anuluj</button>
         </div>
       </div>
@@ -1790,11 +1794,68 @@ function renderMgPayouts(){
   el.innerHTML=recent.map(p=>`<div class="wr"><div><div style="font-size:13px;font-weight:500">${p.worker}</div><div style="font-size:12px;color:var(--tx2)">${p.date} · ${p.note||'Wypłata'}</div></div><span style="font-size:14px;font-weight:500;color:#27500A">${fmt(p.amount)} zł</span></div>`).join('');
 }
 
+let mgrRepItems=[];
+
+function renderMgrRepItems(){
+  const el=document.getElementById('mgr-rep-items-list');
+  if(!el) return;
+  if(!mgrRepItems.length){el.innerHTML='<div style="font-size:12px;color:var(--tx2);margin-bottom:8px">Brak pozycji.</div>';return;}
+  el.innerHTML=mgrRepItems.map((item,i)=>`
+    <div class="ri" style="padding:5px 0">
+      <div class="row">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${item.name}</div>
+          <div style="font-size:12px;color:var(--tx2)">${item.qty} szt.</div>
+        </div>
+        <button class="btn btn-gray btn-sm" onclick="mgrRepItems.splice(${i},1);renderMgrRepItems()"><i class="ti ti-x"></i></button>
+      </div>
+    </div>`).join('');
+}
+
+function addMgrRepItem(){
+  const t=document.getElementById('mgr-rep-type').value;
+  if(!t){alert('Wybierz typ zadania.');return;}
+  const qty=parseInt(document.getElementById('mgr-rep-qty').value);
+  if(!qty||qty<1){alert('Podaj ilość.');return;}
+  let name='',projectId=null,catalogId=null,orderId=null;
+  if(t==='catalog'){
+    const v=document.getElementById('mgr-rep-cat').value;
+    const c=catalog.find(x=>String(x.id)===String(v));
+    if(!c){alert('Wybierz produkt.');return;}
+    name=c.name;catalogId=String(v);
+  } else if(t==='order'){
+    const v=document.getElementById('mgr-rep-order').value;
+    const o=orders.find(x=>String(x.id)===String(v));
+    if(!o){alert('Wybierz zamówienie.');return;}
+    const itemSel=document.getElementById('mgr-rep-order-item');
+    const itemIdx=itemSel&&document.getElementById('mgr-rep-order-item-row').style.display!=='none'?parseInt(itemSel.value):null;
+    const item=itemIdx!==null&&o.items?o.items[itemIdx]:null;
+    name=o.client+(item?' — '+item.name:'');
+    orderId=String(v);
+    if(item&&item.catId) catalogId=String(item.catId);
+  } else if(t==='project'){
+    const v=document.getElementById('mgr-rep-proj').value;
+    const p=projects.find(x=>String(x.id)===String(v));
+    if(!p){alert('Wybierz projekt.');return;}
+    name=p.name;projectId=String(v);
+  } else {
+    name=document.getElementById('mgr-rep-custom-name').value.trim();
+    if(!name){alert('Podaj nazwę.');return;}
+  }
+  mgrRepItems.push({name,qty,projectId,catalogId,orderId});
+  document.getElementById('mgr-rep-type').value='';
+  document.getElementById('mgr-rep-qty').value='';
+  ['mgr-rep-catalog-row','mgr-rep-order-row','mgr-rep-project-row','mgr-rep-custom-row'].forEach(id=>document.getElementById(id).style.display='none');
+  renderMgrRepItems();
+}
+
 function toggleMgrAddReport(){
   const form=document.getElementById('mgr-add-report-form');
   const isOpen=form.style.display!=='none';
   form.style.display=isOpen?'none':'block';
+  if(isOpen){mgrRepItems=[];}
   if(!isOpen){
+    mgrRepItems=[];
     const wSel=document.getElementById('mgr-rep-worker');
     wSel.innerHTML=workers.map(w=>`<option value="${w.name}">${w.name}</option>`).join('');
     document.getElementById('mgr-rep-date').value=new Date().toISOString().slice(0,10);
@@ -1828,56 +1889,34 @@ function onMgrRepTypeChange(){
 
 function saveMgrReport(){
   try{
+    if(!mgrRepItems.length){alert('Dodaj co najmniej jedną pozycję.');return;}
     const workerName=document.getElementById('mgr-rep-worker').value;
     if(!workerName){alert('Wybierz pracownika.');return;}
-    const t=document.getElementById('mgr-rep-type').value;
-    if(!t){alert('Wybierz typ zadania.');return;}
-    const qty=parseInt(document.getElementById('mgr-rep-qty').value);
-    if(!qty||qty<1){alert('Podaj ilość.');return;}
     const shift=document.getElementById('mgr-rep-shift').value;
     const hours=parseFloat(document.getElementById('mgr-rep-hours').value)||null;
     const notes=document.getElementById('mgr-rep-notes').value.trim();
     const dateVal=document.getElementById('mgr-rep-date').value;
     const entryDate=dateVal?new Date(dateVal).toLocaleDateString('pl-PL'):today();
     const isBackdate=entryDate!==today();
-    let name='',projectId=null,catalogId=null,orderId=null;
-    if(t==='catalog'){
-      const v=document.getElementById('mgr-rep-cat').value;
-      const c=catalog.find(x=>String(x.id)===String(v));
-      if(!c){alert('Wybierz produkt.');return;}
-      name=c.name;catalogId=String(v);
-    } else if(t==='order'){
-      const v=document.getElementById('mgr-rep-order').value;
-      const o=orders.find(x=>String(x.id)===String(v));
-      if(!o){alert('Wybierz zamówienie.');return;}
-      const itemSel=document.getElementById('mgr-rep-order-item');
-      const itemIdx=itemSel&&itemSel.parentElement.style.display!=='none'?parseInt(itemSel.value):null;
-      const item=itemIdx!==null&&o.items?o.items[itemIdx]:null;
-      name=o.client+(item?' — '+item.name:'');
-      orderId=String(v);
-      if(item&&item.catId) catalogId=String(item.catId);
-    } else if(t==='project'){
-      const v=document.getElementById('mgr-rep-proj').value;
-      const p=projects.find(x=>String(x.id)===String(v));
-      if(!p){alert('Wybierz projekt.');return;}
-      name=p.name;projectId=String(v);
-    } else {
-      name=document.getElementById('mgr-rep-custom-name').value.trim();
-      if(!name){alert('Podaj nazwę zadania.');return;}
-    }
-    const rep={
-      id:Date.now(),user:workerName,
-      projectId,catalogId,orderId,
-      qtyDone:qty,shift,hours,notes,name,
-      date:entryDate,
-      time:new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}),
-      backdate:isBackdate,
-      seenByManager:true,
-      addedByManager:true
-    };
-    reports.unshift(rep);
-    if(projectId){const p=projects.find(x=>String(x.id)===String(projectId));if(p&&projDone(p.id)>=p.target)p.status='done';}
-    if(orderId){const o=orders.find(x=>String(x.id)===String(orderId));if(o&&orderDone(o.id)>=o.target)o.status='done';}
+    const timeStr=new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'});
+    mgrRepItems.forEach((item,idx)=>{
+      const rep={
+        id:Date.now()+idx,user:workerName,
+        projectId:item.projectId||null,
+        catalogId:item.catalogId||null,
+        orderId:item.orderId||null,
+        qtyDone:item.qty,shift,hours,
+        notes:idx===0?notes:'',
+        name:item.name,
+        date:entryDate,time:timeStr,
+        backdate:isBackdate,
+        seenByManager:true,addedByManager:true
+      };
+      reports.unshift(rep);
+      if(item.projectId){const p=projects.find(x=>String(x.id)===String(item.projectId));if(p&&projDone(p.id)>=p.target)p.status='done';}
+      if(item.orderId){const o=orders.find(x=>String(x.id)===String(item.orderId));if(o&&orderDone(o.id)>=o.target)o.status='done';}
+    });
+    mgrRepItems=[];
     recalcOrderStocks();
     save();
     toggleMgrAddReport();
