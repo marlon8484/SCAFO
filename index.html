@@ -234,7 +234,7 @@ textarea{resize:none;height:56px}
     <div id="w-earn-summary"></div>
     <div class="divider"></div>
     <div class="sec-title">Kalendarz zarobków</div>
-    <div id="w-earn-calendar">TEST</div>
+    <div id="w-earn-calendar"></div>
     <div class="divider"></div>
     <div class="sec-title">Historia wypłat</div>
     <div id="w-payouts-list"></div>
@@ -298,6 +298,9 @@ textarea{resize:none;height:56px}
       </select>
     </div>
     <div id="pw-earn-summary"></div>
+    <div class="divider"></div>
+    <div class="sec-title">Kalendarz zarobków</div>
+    <div id="pw-earn-calendar"></div>
     <div class="divider"></div>
     <div class="sec-title">Historia wypłat</div>
     <div id="pw-payouts-list"></div>
@@ -2505,6 +2508,124 @@ function renderPwToday(){
   }).join('');
 }
 
+function renderPwEarningsCalendar(){
+  const el=document.getElementById('pw-earn-calendar');
+  if(!el) return;
+  const myReports=reports.filter(r=>r.user===currentUser.name);
+  if(!myReports.length){el.innerHTML='<div style="font-size:13px;color:var(--tx2)">Brak wpisów.</div>';return;}
+  const byDate={};
+  myReports.forEach(r=>{
+    if(!r.date) return;
+    if(!byDate[r.date]) byDate[r.date]={reps:[],totalEarn:0,totalQty:0};
+    const e=earn(r);
+    byDate[r.date].reps.push(r);
+    byDate[r.date].totalEarn+=e;
+    byDate[r.date].totalQty+=r.qtyDone;
+  });
+  const now=new Date();
+  let calY=parseInt(el.dataset.year||now.getFullYear());
+  let calM=parseInt(el.dataset.month||now.getMonth());
+  const firstDay=new Date(calY,calM,1);
+  const lastDay=new Date(calY,calM+1,0);
+  const monthName=firstDay.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+  let startDow=firstDay.getDay();
+  if(startDow===0) startDow=7;
+  const days=['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
+  let cells='';
+  for(let i=1;i<startDow;i++) cells+=`<div style="min-height:52px"></div>`;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=`${d}.${calM+1}.${calY}`;
+    const dayData=byDate[ds];
+    const todayStr=`${now.getDate()}.${now.getMonth()+1}.${now.getFullYear()}`;
+    const isToday=ds===todayStr;
+    let content='';
+    if(dayData){
+      const earnStr=dayData.totalEarn>0?`<div style="font-size:9px;font-weight:500;color:#27500A;white-space:nowrap">${fmt(dayData.totalEarn)} zł</div>`:'';
+      content=`<div style="font-size:9px;color:var(--tx2)">${dayData.totalQty} szt.</div>${earnStr}`;
+    }
+    cells+=`<div onclick="togglePwEarnDay('${ds}')"
+      style="min-height:52px;border-radius:var(--rmd);background:${dayData?'#EAF3DE':isToday?'#E6F1FB':'var(--bg2)'};
+      padding:3px;cursor:${dayData?'pointer':'default'};border:1px solid ${isToday?'#185FA5':'transparent'}">
+      <div style="font-size:11px;font-weight:500;color:${isToday?'#185FA5':'var(--tx)'}">${d}</div>
+      ${content}
+    </div>`;
+  }
+  const monthTotal=Object.keys(byDate)
+    .filter(ds=>{const p=ds.split('.');return p.length===3&&parseInt(p[1])-1===calM&&parseInt(p[2])===calY;})
+    .reduce((a,ds)=>a+byDate[ds].totalEarn,0);
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <button class="btn btn-gray btn-sm" style="margin:0" onclick="pwEarnCalPrev()"><i class="ti ti-chevron-left"></i></button>
+      <div style="font-size:13px;font-weight:500;text-transform:capitalize">${monthName}</div>
+      <button class="btn btn-gray btn-sm" style="margin:0" onclick="pwEarnCalNext()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    ${monthTotal>0?`<div style="font-size:12px;color:#27500A;font-weight:500;text-align:center;margin-bottom:8px;background:#EAF3DE;padding:5px;border-radius:var(--rmd)">Zarobki w tym miesiącu: ${fmt(monthTotal)} zł</div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${days.map(d=>`<div style="text-align:center;font-size:10px;color:var(--tx2);padding:3px 0;font-weight:500">${d}</div>`).join('')}
+      ${cells}
+    </div>
+    <div id="pw-earn-day-detail" style="display:none"></div>
+  `;
+  el.dataset.year=calY;
+  el.dataset.month=calM;
+}
+
+function pwEarnCalPrev(){
+  const el=document.getElementById('pw-earn-calendar');
+  if(!el) return;
+  let y=parseInt(el.dataset.year||new Date().getFullYear());
+  let m=parseInt(el.dataset.month||new Date().getMonth());
+  m--;if(m<0){m=11;y--;}
+  el.dataset.year=y;el.dataset.month=m;
+  renderPwEarningsCalendar();
+}
+function pwEarnCalNext(){
+  const el=document.getElementById('pw-earn-calendar');
+  if(!el) return;
+  let y=parseInt(el.dataset.year||new Date().getFullYear());
+  let m=parseInt(el.dataset.month||new Date().getMonth());
+  m++;if(m>11){m=0;y++;}
+  el.dataset.year=y;el.dataset.month=m;
+  renderPwEarningsCalendar();
+}
+
+function togglePwEarnDay(ds){
+  const myReports=reports.filter(r=>r.user===currentUser.name&&r.date===ds);
+  if(!myReports.length) return;
+  const el=document.getElementById('pw-earn-day-detail');
+  if(!el) return;
+  if(el.dataset.date===ds&&el.style.display!=='none'){
+    el.style.display='none';el.dataset.date='';return;
+  }
+  el.dataset.date=ds;el.style.display='block';
+  const totalEarn=myReports.reduce((a,r)=>a+earn(r),0);
+  const totalQty=myReports.reduce((a,r)=>a+r.qtyDone,0);
+  el.innerHTML=`
+    <div class="card" style="padding:10px 14px">
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px">${ds}
+        ${totalEarn>0?`<span style="float:right;color:#27500A">${fmt(totalEarn)} zł</span>`:''}
+      </div>
+      ${myReports.map(r=>{
+        const e=earn(r);
+        return `<div class="ri" style="padding:6px 0">
+          <div class="row">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500">${r.name}</div>
+              <div style="font-size:12px;color:var(--tx2)">${r.time}${r.hours?` · ${r.hours}h`:''}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:13px;font-weight:500">${r.qtyDone} szt.</div>
+              ${e>0?`<div style="font-size:12px;color:#27500A;font-weight:500">${fmt(e)} zł</div>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      <div style="font-size:12px;color:var(--tx2);margin-top:6px;padding-top:6px;border-top:0.5px solid var(--bdr)">
+        Łącznie: ${totalQty} szt.${totalEarn>0?` · <span style="color:#27500A;font-weight:500">${fmt(totalEarn)} zł</span>`:''}
+      </div>
+    </div>`;
+}
+
 function renderPwEarnings(){
   const period=document.getElementById('pw-earn-period')?document.getElementById('pw-earn-period').value:'today';
   const ep=earnPeriod(currentUser.name,period);
@@ -2562,7 +2683,7 @@ function pwTab(tab){
     document.getElementById('pwt-tab-'+t).style.display=tab===t?'block':'none';
     document.getElementById('pwt-'+t).classList.toggle('act-tab',tab===t);
   });
-  if(tab==='zarobki'){renderPwEarnings();renderPwPayouts();}
+  if(tab==='zarobki'){renderPwEarnings();renderPwPayouts();renderPwEarningsCalendar();}
   if(tab==='kalendarz') renderPwCalendar();
 }
 
