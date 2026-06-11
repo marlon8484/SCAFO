@@ -349,6 +349,7 @@ textarea{resize:none;height:56px}
   <div class="tab-bar">
     <button class="tab act-tab" id="mt-wyplaty" onclick="mTab('wyplaty')">Wypłaty</button>
     <button class="tab" id="mt-raporty" onclick="mTab('raporty')">Raporty</button>
+    <button class="tab" id="mt-rapkal" onclick="mTab('rapkal')">Kal. rap.</button>
     <button class="tab" id="mt-mag" onclick="mTab('mag')">Magazyn</button>
     <button class="tab" id="mt-zam" onclick="mTab('zam')">Zamówienia</button>
     <button class="tab" id="mt-ust" onclick="mTab('ust')">Ustawienia</button>
@@ -3605,7 +3606,7 @@ function importData(event){
 function renderManager(){renderMgEarn();renderMgPayouts();renderMgReports();renderMgMag();renderMgRates();renderMgWorkers();renderMgOrders();}
 
 function mTab(tab){
-  ['wyplaty','raporty','mag','zam','ust'].forEach(t=>{
+  ['wyplaty','raporty','rapkal','mag','zam','ust'].forEach(t=>{
     document.getElementById('mt-tab-'+t).style.display=tab===t?'block':'none';
     document.getElementById('mt-'+t).classList.toggle('act-tab',tab===t);
     document.getElementById('mn-'+t).classList.toggle('act',tab===t);
