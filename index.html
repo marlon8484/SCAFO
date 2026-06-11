@@ -3607,8 +3607,8 @@ function renderManager(){renderMgEarn();renderMgPayouts();renderMgReports();rend
 
 function mTab(tab){
   ['wyplaty','raporty','rapkal','mag','zam','ust'].forEach(t=>{
-    document.getElementById('mt-tab-'+t).style.display=tab===t?'block':'none';
-    document.getElementById('mt-'+t).classList.toggle('act-tab',tab===t);
+    const tabEl=document.getElementById('mt-tab-'+t);if(tabEl) tabEl.style.display=tab===t?'block':'none';
+    const btnEl=document.getElementById('mt-'+t);if(btnEl) btnEl.classList.toggle('act-tab',tab===t);
     document.getElementById('mn-'+t).classList.toggle('act',tab===t);
   });
   if(tab==='ust')uTab('prac');
