@@ -878,6 +878,9 @@ function save(){
   localStorage.setItem('pa6_vacations',JSON.stringify(vacations));
   localStorage.setItem('pa6_reports',JSON.stringify(reports));
   localStorage.setItem('pa6_payouts',JSON.stringify(payouts));
+  // debounced cloud save
+  if(saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout=setTimeout(()=>supaSave(),1500);
 }
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);}
 function today(){return new Date().toLocaleDateString('pl-PL');}
@@ -1861,14 +1864,16 @@ function renderMgrReportCalendar(){
   let calY=parseInt(el.dataset.year||now.getFullYear());
   let calM=parseInt(el.dataset.month||now.getMonth());
 
-  // Group reports by date and worker
+  // Group reports by date and worker - normalize date format to dd.mm.yyyy
   const byDate={};
   reports.forEach(r=>{
     if(!r.date) return;
-    if(!byDate[r.date]) byDate[r.date]={workers:new Set(),totalQty:0,reps:[]};
-    byDate[r.date].workers.add(r.user);
-    byDate[r.date].totalQty+=r.qtyDone;
-    byDate[r.date].reps.push(r);
+    const parts=r.date.split('.');
+    const normDate=parts.length===3?`${parts[0].padStart(2,'0')}.${parts[1].padStart(2,'0')}.${parts[2]}`:r.date;
+    if(!byDate[normDate]) byDate[normDate]={workers:new Set(),totalQty:0,reps:[]};
+    byDate[normDate].workers.add(r.user);
+    byDate[normDate].totalQty+=r.qtyDone;
+    byDate[normDate].reps.push(r);
   });
 
   const firstDay=new Date(calY,calM,1);
@@ -1962,7 +1967,12 @@ function mgrRepCalNext(){
 function toggleMgrRepDay(ds){
   const el=document.getElementById('mgr-rep-day-detail');
   if(!el) return;
-  const dayReps=reports.filter(r=>r.date===ds);
+  const dayReps=reports.filter(r=>{
+    if(!r.date) return false;
+    const parts=r.date.split('.');
+    const norm=parts.length===3?`${parts[0].padStart(2,'0')}.${parts[1].padStart(2,'0')}.${parts[2]}`:r.date;
+    return norm===ds;
+  });
   if(!dayReps.length) return;
   if(el.dataset.date===ds&&el.style.display!=='none'){
     el.style.display='none';el.dataset.date='';return;
