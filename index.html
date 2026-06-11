@@ -3622,6 +3622,8 @@ function mTab(tab){
     const navEl=document.getElementById('mn-'+t);if(navEl) navEl.classList.toggle('act',tab===t);
   });
   if(tab==='ust')uTab('prac');
+  if(tab==='raporty'){renderMgReports();}
+  if(tab==='rapkal'){renderMgrReportCalendar();}
 }
 
 function uTab(tab){
