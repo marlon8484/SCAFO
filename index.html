@@ -365,6 +365,59 @@ textarea{resize:none;height:56px}
     <div id="mg-payouts"></div>
   </div>
   <div id="mt-tab-raporty" style="display:none">
+    <button class="btn btn-blue" style="margin-bottom:12px" onclick="toggleMgrAddReport()"><i class="ti ti-plus"></i> Dodaj wpis w imieniu pracownika</button>
+    <div id="mgr-add-report-form" style="display:none">
+      <div class="card" style="margin-bottom:14px">
+        <div style="font-size:13px;font-weight:500;margin-bottom:12px">Nowy wpis — manager</div>
+        <div class="lbl">Pracownik</div>
+        <select id="mgr-rep-worker"></select>
+        <div class="lbl">Data wpisu</div>
+        <input type="date" id="mgr-rep-date" />
+        <div class="lbl">Zmiana</div>
+        <select id="mgr-rep-shift">
+          <option value="rano">Rano</option>
+          <option value="popołudnie">Popołudnie (akord)</option>
+        </select>
+        <div class="lbl">Typ zadania</div>
+        <select id="mgr-rep-type" onchange="onMgrRepTypeChange()">
+          <option value="">— wybierz —</option>
+          <option value="catalog">Produkt z katalogu</option>
+          <option value="order">Zamówienie klienta</option>
+          <option value="project">Projekt długoterminowy</option>
+          <option value="custom">Inne / własne</option>
+        </select>
+        <div id="mgr-rep-catalog-row" style="display:none">
+          <div class="lbl">Produkt</div>
+          <select id="mgr-rep-cat"></select>
+        </div>
+        <div id="mgr-rep-order-row" style="display:none">
+          <div class="lbl">Zamówienie</div>
+          <select id="mgr-rep-order"></select>
+          <div id="mgr-rep-order-item-row" style="display:none">
+            <div class="lbl">Produkt z zamówienia</div>
+            <select id="mgr-rep-order-item"></select>
+          </div>
+        </div>
+        <div id="mgr-rep-project-row" style="display:none">
+          <div class="lbl">Projekt</div>
+          <select id="mgr-rep-proj"></select>
+        </div>
+        <div id="mgr-rep-custom-row" style="display:none">
+          <div class="lbl">Nazwa zadania</div>
+          <input type="text" id="mgr-rep-custom-name" placeholder="np. Czyszczenie linii" />
+        </div>
+        <div class="lbl">Ilość (szt.)</div>
+        <input type="number" id="mgr-rep-qty" min="1" inputmode="numeric" />
+        <div class="lbl">Czas pracy (godz.) — opcjonalne</div>
+        <input type="number" id="mgr-rep-hours" min="0" step="0.5" inputmode="decimal" />
+        <div class="lbl">Uwagi</div>
+        <textarea id="mgr-rep-notes" placeholder="opcjonalne..."></textarea>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-blue" style="flex:1;margin:0" onclick="saveMgrReport()"><i class="ti ti-check"></i> Zapisz</button>
+          <button class="btn btn-gray" style="flex:1;margin:0" onclick="toggleMgrAddReport()">Anuluj</button>
+        </div>
+      </div>
+    </div>
     <div class="card" style="margin-bottom:10px">
       <div class="lbl">Filtruj dzień</div>
       <input type="date" id="mg-date" onchange="renderMgReports()" />
@@ -1735,6 +1788,105 @@ function renderMgPayouts(){
   const recent=payouts.slice(0,20);
   if(!recent.length){el.innerHTML='<div style="font-size:13px;color:var(--tx2)">Brak historii wypłat.</div>';return;}
   el.innerHTML=recent.map(p=>`<div class="wr"><div><div style="font-size:13px;font-weight:500">${p.worker}</div><div style="font-size:12px;color:var(--tx2)">${p.date} · ${p.note||'Wypłata'}</div></div><span style="font-size:14px;font-weight:500;color:#27500A">${fmt(p.amount)} zł</span></div>`).join('');
+}
+
+function toggleMgrAddReport(){
+  const form=document.getElementById('mgr-add-report-form');
+  const isOpen=form.style.display!=='none';
+  form.style.display=isOpen?'none':'block';
+  if(!isOpen){
+    const wSel=document.getElementById('mgr-rep-worker');
+    wSel.innerHTML=workers.map(w=>`<option value="${w.name}">${w.name}</option>`).join('');
+    document.getElementById('mgr-rep-date').value=new Date().toISOString().slice(0,10);
+    const catSel=document.getElementById('mgr-rep-cat');
+    catSel.innerHTML=catalog.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    const orderSel=document.getElementById('mgr-rep-order');
+    orderSel.innerHTML=orders.filter(o=>o.status==='active').map(o=>`<option value="${o.id}">${o.client}</option>`).join('');
+    orderSel.onchange=()=>{
+      const o=orders.find(x=>String(x.id)===String(orderSel.value));
+      const itemRow=document.getElementById('mgr-rep-order-item-row');
+      const itemSel=document.getElementById('mgr-rep-order-item');
+      if(o&&o.items&&o.items.length){
+        itemRow.style.display='block';
+        itemSel.innerHTML=o.items.map((item,i)=>`<option value="${i}">${item.name}</option>`).join('');
+      } else { itemRow.style.display='none'; }
+    };
+    const projSel=document.getElementById('mgr-rep-proj');
+    projSel.innerHTML=projects.filter(p=>p.status==='active').map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    document.getElementById('mgr-rep-type').value='';
+    ['mgr-rep-catalog-row','mgr-rep-order-row','mgr-rep-project-row','mgr-rep-custom-row'].forEach(id=>document.getElementById(id).style.display='none');
+  }
+}
+
+function onMgrRepTypeChange(){
+  const t=document.getElementById('mgr-rep-type').value;
+  document.getElementById('mgr-rep-catalog-row').style.display=t==='catalog'?'block':'none';
+  document.getElementById('mgr-rep-order-row').style.display=t==='order'?'block':'none';
+  document.getElementById('mgr-rep-project-row').style.display=t==='project'?'block':'none';
+  document.getElementById('mgr-rep-custom-row').style.display=t==='custom'?'block':'none';
+}
+
+function saveMgrReport(){
+  try{
+    const workerName=document.getElementById('mgr-rep-worker').value;
+    if(!workerName){alert('Wybierz pracownika.');return;}
+    const t=document.getElementById('mgr-rep-type').value;
+    if(!t){alert('Wybierz typ zadania.');return;}
+    const qty=parseInt(document.getElementById('mgr-rep-qty').value);
+    if(!qty||qty<1){alert('Podaj ilość.');return;}
+    const shift=document.getElementById('mgr-rep-shift').value;
+    const hours=parseFloat(document.getElementById('mgr-rep-hours').value)||null;
+    const notes=document.getElementById('mgr-rep-notes').value.trim();
+    const dateVal=document.getElementById('mgr-rep-date').value;
+    const entryDate=dateVal?new Date(dateVal).toLocaleDateString('pl-PL'):today();
+    const isBackdate=entryDate!==today();
+    let name='',projectId=null,catalogId=null,orderId=null;
+    if(t==='catalog'){
+      const v=document.getElementById('mgr-rep-cat').value;
+      const c=catalog.find(x=>String(x.id)===String(v));
+      if(!c){alert('Wybierz produkt.');return;}
+      name=c.name;catalogId=String(v);
+    } else if(t==='order'){
+      const v=document.getElementById('mgr-rep-order').value;
+      const o=orders.find(x=>String(x.id)===String(v));
+      if(!o){alert('Wybierz zamówienie.');return;}
+      const itemSel=document.getElementById('mgr-rep-order-item');
+      const itemIdx=itemSel&&itemSel.parentElement.style.display!=='none'?parseInt(itemSel.value):null;
+      const item=itemIdx!==null&&o.items?o.items[itemIdx]:null;
+      name=o.client+(item?' — '+item.name:'');
+      orderId=String(v);
+      if(item&&item.catId) catalogId=String(item.catId);
+    } else if(t==='project'){
+      const v=document.getElementById('mgr-rep-proj').value;
+      const p=projects.find(x=>String(x.id)===String(v));
+      if(!p){alert('Wybierz projekt.');return;}
+      name=p.name;projectId=String(v);
+    } else {
+      name=document.getElementById('mgr-rep-custom-name').value.trim();
+      if(!name){alert('Podaj nazwę zadania.');return;}
+    }
+    const rep={
+      id:Date.now(),user:workerName,
+      projectId,catalogId,orderId,
+      qtyDone:qty,shift,hours,notes,name,
+      date:entryDate,
+      time:new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}),
+      backdate:isBackdate,
+      seenByManager:true,
+      addedByManager:true
+    };
+    reports.unshift(rep);
+    if(projectId){const p=projects.find(x=>String(x.id)===String(projectId));if(p&&projDone(p.id)>=p.target)p.status='done';}
+    if(orderId){const o=orders.find(x=>String(x.id)===String(orderId));if(o&&orderDone(o.id)>=o.target)o.status='done';}
+    recalcOrderStocks();
+    save();
+    toggleMgrAddReport();
+    renderMgReports();
+    showToast('Wpis dodany!');
+  } catch(err){
+    alert('Błąd: '+err.message);
+    console.error(err);
+  }
 }
 
 function renderMgReports(){
