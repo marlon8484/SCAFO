@@ -474,12 +474,20 @@ textarea{resize:none;height:56px}
           <div class="lbl">Zamówienie klienta</div>
           <select id="mg-sh-order"><option value="">— wybierz zamówienie —</option></select>
           <div id="mg-sh-order-info" style="display:none;font-size:12px;color:var(--tx2);margin-bottom:10px"></div>
+          <div class="lbl">Data wydania</div>
+          <input type="date" id="mg-sh-date" />
           <div style="font-size:13px;font-weight:500;margin:4px 0 8px">Produkty do wydania</div>
           <div id="mg-sh-items-list"></div>
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            <select id="mg-sh-item-prod" style="flex:1;margin:0"><option value="">— produkt —</option></select>
+          <div style="display:flex;gap:8px;margin-bottom:6px">
+            <select id="mg-sh-item-prod" style="flex:1;margin:0"><option value="">— produkt z zamówienia —</option></select>
             <input type="number" id="mg-sh-item-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0" />
             <button class="btn btn-gray btn-sm" onclick="addMgrShipmentItem()"><i class="ti ti-plus"></i></button>
+          </div>
+          <div style="font-size:12px;color:var(--tx2);margin-bottom:4px">Lub dodaj pozycję spoza zamówienia:</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input type="text" id="mg-sh-custom-name" placeholder="Nazwa produktu" style="flex:1;margin:0" />
+            <input type="number" id="mg-sh-custom-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0" />
+            <button class="btn btn-gray btn-sm" onclick="addMgrShipmentCustomItem()"><i class="ti ti-plus"></i></button>
           </div>
           <div class="lbl">Uwagi</div>
           <textarea id="mg-sh-notes" placeholder="opcjonalne..."></textarea>
@@ -3146,7 +3154,13 @@ function catStockRaw(catId,name){
   if(catId){
     const c=catalog.find(x=>x.id==catId);
     if(c&&c.stockItem===false) return 0;
-    return reports.filter(r=>r.catalogId==catId).reduce((a,r)=>a+r.qtyDone,0);
+    const produced=reports.filter(r=>r.catalogId==catId).reduce((a,r)=>a+r.qtyDone,0);
+    const adj=adjustments.filter(a=>String(a.catId)===String(catId)).reduce((a,x)=>{
+      if(['opening','purchase','correction_plus'].includes(x.type)) return a+x.qty;
+      if(['correction_minus','sale'].includes(x.type)) return a-x.qty;
+      return a;
+    },0);
+    return produced+adj;
   }
   return reports.filter(r=>r.name===name&&!r.catalogId&&!r.projectId&&!r.orderId).reduce((a,r)=>a+r.qtyDone,0);
 }
@@ -3196,6 +3210,8 @@ function openMgrShipmentForm(){
   mgShItems=[];
   renderMgrShItems();
   // populate order select
+  const dateEl=document.getElementById('mg-sh-date');
+  if(dateEl) dateEl.value=new Date().toISOString().slice(0,10);
   const sel=document.getElementById('mg-sh-order');
   sel.innerHTML='<option value="">— wybierz zamówienie —</option>';
   orders.filter(o=>o.status==='active').forEach(o=>sel.innerHTML+=`<option value="${o.id}">${o.client}${o.deadline?' · '+new Date(o.deadline).toLocaleDateString('pl-PL'):''}</option>`);
@@ -3216,7 +3232,7 @@ function openMgrShipmentForm(){
       (o.items||[]).forEach((i,idx)=>{
         const shipped=orderShipped(o.id,i.catId,i.name);
         const avail=Math.max(0,catStockRaw(i.catId,i.name)-shipped);
-        if(avail>0) psel.innerHTML+=`<option value="${idx}" data-name="${i.name}" data-unit="${i.unit}" data-catid="${i.catId||''}">${i.name} (dostępne: ${avail} szt.)</option>`;
+        psel.innerHTML+=`<option value="${idx}" data-name="${i.name}" data-unit="${i.unit}" data-catid="${i.catId||''}">${i.name} (na stanie: ${avail} szt.)</option>`;
       });
     } else { info.style.display='none'; psel.innerHTML='<option value="">— produkt —</option>'; }
   };
@@ -3225,6 +3241,17 @@ function openMgrShipmentForm(){
 function closeMgrShipmentForm(){
   document.getElementById('mg-shipment-form').style.display='none';
   mgShItems=[];
+}
+
+function addMgrShipmentCustomItem(){
+  const name=document.getElementById('mg-sh-custom-name').value.trim();
+  const qty=parseInt(document.getElementById('mg-sh-custom-qty').value);
+  if(!name){alert('Wpisz nazwę produktu.');return;}
+  if(!qty||qty<1){alert('Podaj ilość.');return;}
+  mgShItems.push({name,unit:'szt.',catId:null,qty,custom:true});
+  document.getElementById('mg-sh-custom-name').value='';
+  document.getElementById('mg-sh-custom-qty').value='';
+  renderMgrShItems();
 }
 
 function addMgrShipmentItem(){
@@ -3250,7 +3277,9 @@ function confirmMgrShipment(){
   if(!mgShItems.length){alert('Dodaj co najmniej jeden produkt.');return;}
   const notes=document.getElementById('mg-sh-notes').value.trim();
   const o=orders.find(x=>String(x.id)===String(orderId));
-  shipments.unshift({id:Date.now(),orderId,client:o?o.client:'',items:JSON.parse(JSON.stringify(mgShItems)),notes,date:today(),time:new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}),confirmedBy:currentUser.type==='manager'?'Manager':currentUser.name,confirmed:true});
+  const shDateVal=document.getElementById('mg-sh-date').value;
+  const shDate=shDateVal?new Date(shDateVal).toLocaleDateString('pl-PL'):today();
+  shipments.unshift({id:Date.now(),orderId,client:o?o.client:'',items:JSON.parse(JSON.stringify(mgShItems)),notes,date:shDate,time:new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}),confirmedBy:currentUser.type==='manager'?'Manager':currentUser.name,confirmed:true});
   mgShItems=[];
   if(o&&o.items){
     const allDone=o.items.every(i=>{
