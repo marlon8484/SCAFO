@@ -483,9 +483,14 @@ textarea{resize:none;height:56px}
             <input type="number" id="mg-sh-item-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0" />
             <button class="btn btn-gray btn-sm" onclick="addMgrShipmentItem()"><i class="ti ti-plus"></i></button>
           </div>
-          <div style="font-size:12px;color:var(--tx2);margin-bottom:4px">Lub dodaj pozycję spoza zamówienia:</div>
+          <div style="font-size:12px;color:var(--tx2);margin-bottom:4px">Dodaj pozycję poza magazynem (nie wpływa na stan):</div>
+          <div style="display:flex;gap:8px;margin-bottom:4px">
+            <select id="mg-sh-custom-cat" style="flex:1;margin:0" onchange="onMgShCustomCatChange()">
+              <option value="">— wybierz z katalogu —</option>
+            </select>
+          </div>
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            <input type="text" id="mg-sh-custom-name" placeholder="Nazwa produktu" style="flex:1;margin:0" />
+            <input type="text" id="mg-sh-custom-name" placeholder="Lub wpisz własną nazwę" style="flex:1;margin:0" />
             <input type="number" id="mg-sh-custom-qty" placeholder="szt." min="1" inputmode="numeric" style="width:70px;margin:0" />
             <button class="btn btn-gray btn-sm" onclick="addMgrShipmentCustomItem()"><i class="ti ti-plus"></i></button>
           </div>
@@ -2533,7 +2538,10 @@ function openOrderDetail(oid){
   const totalDone=orderDone(oid);
   const pp=pct(totalDone,o.target);
 
-  document.getElementById('od-content').innerHTML=linkHtml+`
+  const doneBtn=`<button class="btn ${isDone?'btn-gray':'btn-blue'}" style="margin-bottom:12px;width:100%" onclick="toggleOrderStatus('${oid}');backFromOrderDetail()">
+    <i class="ti ti-${isDone?'refresh':'circle-check'}"></i> ${isDone?'Przywróć jako aktywne':'Oznacz jako zrealizowane'}
+  </button>`;
+  document.getElementById('od-content').innerHTML=doneBtn+linkHtml+`
     <div class="card" style="margin-bottom:12px">
       <div class="row" style="margin-bottom:8px">
         <div>
@@ -2727,6 +2735,22 @@ function closeEditOrder(){
   mTab('zam');
 }
 
+function toggleOrderStatus(oid){
+  const o=orders.find(x=>String(x.id)===String(oid));
+  if(!o) return;
+  if(o.status==='done'){
+    if(!confirm('Przywrócić zamówienie jako aktywne?')) return;
+    o.status='active';
+    showToast('Zamówienie przywrócone jako aktywne');
+  } else {
+    if(!confirm('Oznaczyć zamówienie "'+o.client+'" jako zrealizowane?')) return;
+    o.status='done';
+    showToast('Zamówienie oznaczone jako zrealizowane!');
+  }
+  save();
+  renderMgOrders();
+}
+
 function deleteOrder(id){
   const o=orders.find(x=>x.id==id);
   if(!o||!confirm('Usunąć zamówienie?'))return;
@@ -2788,6 +2812,7 @@ function renderMgOrders(){
         <div style="display:flex;gap:6px;align-items:center">
           <span class="badge ${isDone?'b-green':urgent?'b-red':'b-blue'}">${isDone?'Gotowe':pp+'%'}</span>
           <button class="btn btn-gray btn-sm" onclick="event.stopPropagation();openEditOrder('${o.id}')" title="Edytuj"><i class="ti ti-pencil"></i></button>
+          <button class="btn btn-gray btn-sm" onclick="event.stopPropagation();toggleOrderStatus('${o.id}')" title="${isDone?'Wznów':'Oznacz jako zrealizowane'}"><i class="ti ti-${isDone?'refresh':'circle-check'}"></i></button>
           <button class="btn btn-gray btn-sm" onclick="event.stopPropagation();deleteOrder(${o.id})"><i class="ti ti-trash"></i></button>
         </div>
       </div>
@@ -3212,6 +3237,8 @@ function openMgrShipmentForm(){
   // populate order select
   const dateEl=document.getElementById('mg-sh-date');
   if(dateEl) dateEl.value=new Date().toISOString().slice(0,10);
+  const customCat=document.getElementById('mg-sh-custom-cat');
+  if(customCat) customCat.innerHTML='<option value="">— wybierz z katalogu —</option>'+catalog.map(c=>`<option value="${c.id}" data-name="${c.name}" data-unit="${c.unit}">${c.name}</option>`).join('');
   const sel=document.getElementById('mg-sh-order');
   sel.innerHTML='<option value="">— wybierz zamówienie —</option>';
   orders.filter(o=>o.status==='active').forEach(o=>sel.innerHTML+=`<option value="${o.id}">${o.client}${o.deadline?' · '+new Date(o.deadline).toLocaleDateString('pl-PL'):''}</option>`);
@@ -3243,14 +3270,32 @@ function closeMgrShipmentForm(){
   mgShItems=[];
 }
 
+function onMgShCustomCatChange(){
+  const sel=document.getElementById('mg-sh-custom-cat');
+  const nameEl=document.getElementById('mg-sh-custom-name');
+  if(!sel||!nameEl) return;
+  if(sel.value){
+    const opt=sel.options[sel.selectedIndex];
+    nameEl.value=opt.dataset.name||opt.text;
+    nameEl.placeholder='Lub wpisz własną nazwę';
+  }
+}
+
 function addMgrShipmentCustomItem(){
   const name=document.getElementById('mg-sh-custom-name').value.trim();
   const qty=parseInt(document.getElementById('mg-sh-custom-qty').value);
-  if(!name){alert('Wpisz nazwę produktu.');return;}
+  const catSel=document.getElementById('mg-sh-custom-cat');
+  let unit='szt.';
+  if(catSel&&catSel.value){
+    const opt=catSel.options[catSel.selectedIndex];
+    unit=opt.dataset.unit||'szt.';
+  }
+  if(!name){alert('Wpisz nazwę produktu lub wybierz z katalogu.');return;}
   if(!qty||qty<1){alert('Podaj ilość.');return;}
-  mgShItems.push({name,unit:'szt.',catId:null,qty,custom:true});
+  mgShItems.push({name,unit,catId:null,qty,custom:true});
   document.getElementById('mg-sh-custom-name').value='';
   document.getElementById('mg-sh-custom-qty').value='';
+  if(catSel) catSel.value='';
   renderMgrShItems();
 }
 
