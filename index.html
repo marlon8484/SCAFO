@@ -1333,7 +1333,8 @@ function recalcOrderStocks(){
   function physicalStock(cid){
     const c=catalog.find(x=>String(x.id)===String(cid));
     if(c&&c.stockItem===false) return 0;
-    const produced=reports.filter(r=>String(r.catalogId)===String(cid)).reduce((a,r)=>a+r.qtyDone,0);
+    // Only count reports WITHOUT orderId (free production, not assigned to order)
+    const produced=reports.filter(r=>String(r.catalogId)===String(cid)&&!r.orderId).reduce((a,r)=>a+r.qtyDone,0);
     const shipped=shipments.filter(s=>s.confirmed).reduce((a,s)=>{
       const item=s.items.find(i=>String(i.catId)===String(cid));
       return a+(item?item.qty:0);
@@ -1433,7 +1434,7 @@ function renderWorkerToday(){
           <div style="font-weight:500;font-size:13px">${r.name}</div>
           <div style="font-size:12px;color:var(--tx2);margin-top:3px">
             <span class="badge ${r.shift==='popołudnie'?'b-purple':'b-gray'}" style="margin-right:4px">${r.shift}</span>
-            ${r.time}${r.hours?` · ${r.hours}h`:''}${e>0?` · <span style="color:#27500A;font-weight:500">${fmt(e)} zł</span>`:''}
+            ${r.date} · ${r.time}${r.hours?` · ${r.hours}h`:''}${e>0?` · <span style="color:#27500A;font-weight:500">${fmt(e)} zł</span>`:''}
             ${r.backdate?'<span class="badge b-amber" style="margin-left:4px">wsteczny</span>':''}
             ${r.notes?`<br><span style="color:var(--tx2)">${r.notes}</span>`:''}
           </div>
@@ -1579,7 +1580,7 @@ function toggleEarnDay(ds){
               <div style="font-size:13px;font-weight:500">${r.name}</div>
               <div style="font-size:12px;color:var(--tx2)">
                 <span class="badge ${r.shift==='popołudnie'?'b-purple':'b-gray'}" style="margin-right:4px">${r.shift}</span>
-                ${r.time}${r.hours?` · ${r.hours}h`:''}
+                ${r.date} · ${r.time}${r.hours?` · ${r.hours}h`:''}
               </div>
             </div>
             <div style="text-align:right">
@@ -2996,7 +2997,7 @@ function togglePwEarnDay(ds){
           <div class="row">
             <div style="flex:1">
               <div style="font-size:13px;font-weight:500">${r.name}</div>
-              <div style="font-size:12px;color:var(--tx2)">${r.time}${r.hours?` · ${r.hours}h`:''}</div>
+              <div style="font-size:12px;color:var(--tx2)">${r.date} · ${r.time}${r.hours?` · ${r.hours}h`:''}</div>
             </div>
             <div style="text-align:right">
               <div style="font-size:13px;font-weight:500">${r.qtyDone} szt.</div>
