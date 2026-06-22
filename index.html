@@ -1737,9 +1737,11 @@ function changePinWorker(id){
 function toggleWorkerRole(id){
   const w=workers.find(x=>x.id==id);
   if(!w)return;
-  const newRole=w.role==='piecework'?'full':'piecework';
-  const label=newRole==='piecework'?'Akordowy (uproszczony widok)':'Pełny dostęp';
-  if(!confirm(`Zmienić typ konta dla ${w.name} na: ${label}?`))return;
+  const roles=['full','piecework','manager'];
+  const labels={full:'Pełny dostęp',piecework:'Akordowy',manager:'Manager (pełny panel)'};
+  const current=roles.indexOf(w.role);
+  const newRole=roles[(current+1)%roles.length];
+  if(!confirm(`Zmienić typ konta dla ${w.name} na: ${labels[newRole]}?`))return;
   w.role=newRole;
   save();renderMgWorkers();
 }
@@ -1767,7 +1769,7 @@ function renderMgWorkers(){
             <div style="font-size:13px;font-weight:500">${w.name}</div>
             <div style="font-size:12px;color:var(--tx2);margin-top:2px">
               <span class="badge b-gray">${w.schedule}</span>
-              <span class="badge ${w.role==='piecework'?'b-purple':'b-blue'}" style="cursor:pointer" onclick="toggleWorkerRole(${w.id})" title="Kliknij aby zmienić">${w.role==='piecework'?'Akordowy':'Pełny'} ✎</span>
+              <span class="badge ${w.role==='piecework'?'b-purple':w.role==='manager'?'b-teal':'b-blue'}" style="cursor:pointer" onclick="toggleWorkerRole(${w.id})" title="Kliknij aby zmienić">${w.role==='piecework'?'Akordowy':w.role==='manager'?'Manager':'Pełny'} ✎</span>
               · <span style="cursor:pointer;color:var(--tx2)" onclick="changeWorkerSchedule(${w.id})" title="Zmień harmonogram">wypłata: ${w.schedule} ✎</span>
             </div>
           </div>
