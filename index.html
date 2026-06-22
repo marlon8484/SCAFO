@@ -617,6 +617,7 @@ textarea{resize:none;height:56px}
         <select id="nw-role">
           <option value="full">Pełny dostęp</option>
           <option value="piecework">Akordowy (uproszczony widok)</option>
+          <option value="manager">Manager (pełny panel)</option>
         </select>
         <div class="lbl">Harmonogram wypłat</div>
         <select id="nw-sched">
@@ -1061,7 +1062,12 @@ function pinError(){
 
 function loginWorker(w){
   currentUser=w;
-  if(w.role==='piecework'){
+  if(w.role==='manager'){
+    // Worker with manager role gets full manager access
+    currentUser={type:'manager',name:w.name,id:w.id};
+    renderManager();
+    show('screen-manager');
+  } else if(w.role==='piecework'){
     loadPieceworker();
     show('screen-piecework');
   } else {
