@@ -424,8 +424,23 @@ textarea{resize:none;height:56px}
       </div>
     </div>
     <div class="card" style="margin-bottom:10px">
-      <div class="lbl">Filtruj dzień</div>
-      <input type="date" id="mg-date" onchange="renderMgReports()" />
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--tx2)">Od:</span>
+          <input type="date" id="mg-date-from" onchange="renderMgReports()" style="margin:0;width:auto" />
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--tx2)">Do:</span>
+          <input type="date" id="mg-date-to" onchange="renderMgReports()" style="margin:0;width:auto" />
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--tx2)">Pracownik:</span>
+          <select id="mg-worker-filter" onchange="renderMgReports()" style="margin:0">
+            <option value="">Wszyscy</option>
+          </select>
+        </div>
+        <button class="btn btn-gray btn-sm" style="margin:0" onclick="clearMgReportFilters()"><i class="ti ti-x"></i> Wyczyść</button>
+      </div>
     </div>
     <div id="mg-reports"></div>
   </div>
@@ -709,6 +724,10 @@ textarea{resize:none;height:56px}
   <div id="od-content"></div>
 </div>
 
+<div id="cloud-warn" style="display:none;position:fixed;top:0;left:0;right:0;background:#E24B4A;color:#fff;padding:10px 16px;z-index:9998;align-items:center;justify-content:space-between;font-size:13px;font-weight:500">
+  <span><i class="ti ti-cloud-off" style="margin-right:6px"></i> Dane nie są zapisane w chmurze! Zrób eksport.</span>
+  <button onclick="supaSave().then(()=>{})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">Spróbuj ponownie</button>
+</div>
 <div id="toast"><i class="ti ti-circle-check" style="font-size:16px;color:#C0DD97"></i><span id="toast-msg">Zapisano</span></div>
 
 <!-- MODAL EDYCJI RAPORTU -->
@@ -838,11 +857,19 @@ async function supaSave(){
     if(!res.ok){
       const err=await res.text();
       console.error('Supabase save error:',res.status,err);
-      showToast('Błąd zapisu do chmury: '+res.status,true);
+      showToast('⚠️ Dane nie zapisały się w chmurze! Zrób eksport.',true);
+      // Show persistent warning
+      const warn=document.getElementById('cloud-warn');
+      if(warn) warn.style.display='flex';
+    } else {
+      const warn=document.getElementById('cloud-warn');
+      if(warn) warn.style.display='none';
     }
   }catch(e){
     console.error('Supabase save error:',e);
-    showToast('Brak połączenia z chmurą',true);
+    showToast('⚠️ Brak połączenia z chmurą! Zrób eksport.',true);
+    const warn=document.getElementById('cloud-warn');
+    if(warn) warn.style.display='flex';
   }
 }
 
@@ -2112,9 +2139,27 @@ function saveMgrReport(){
 }
 
 function renderMgReports(){
-  const filterDate=document.getElementById('mg-date').value;
+  // Populate worker filter
+  const wSel=document.getElementById('mg-worker-filter');
+  if(wSel&&wSel.options.length<=1){
+    workers.forEach(w=>{const opt=document.createElement('option');opt.value=w.name;opt.textContent=w.name;wSel.appendChild(opt);});
+  }
+  const filterFrom=document.getElementById('mg-date-from')?document.getElementById('mg-date-from').value:'';
+  const filterTo=document.getElementById('mg-date-to')?document.getElementById('mg-date-to').value:'';
+  const filterWorker=document.getElementById('mg-worker-filter')?document.getElementById('mg-worker-filter').value:'';
   let reps=[...reports];
-  if(filterDate){const d=new Date(filterDate);reps=reps.filter(r=>r.date===d.toLocaleDateString('pl-PL'));}
+  if(filterFrom||filterTo||filterWorker){reps=reps.filter(r=>{
+      if(filterWorker&&r.user!==filterWorker) return false;
+      if(filterFrom||filterTo){
+        const parts=r.date?r.date.split('.'):[];
+        if(parts.length===3){
+          const rDate=new Date(parseInt(parts[2]),parseInt(parts[1])-1,parseInt(parts[0]));
+          if(filterFrom&&rDate<new Date(filterFrom)) return false;
+          if(filterTo){const to=new Date(filterTo);to.setHours(23,59,59);if(rDate>to) return false;}
+        }
+      }
+      return true;
+    });}
   const el=document.getElementById('mg-reports');
   if(!reps.length){el.innerHTML='<div style="font-size:13px;color:var(--tx2)">Brak wpisów.</div>';return;}
   const byW={};reps.forEach(r=>{if(!byW[r.user])byW[r.user]=[];byW[r.user].push(r);});
@@ -2192,6 +2237,7 @@ function deleteProject(id){
 }
 
 function renderMgCatalogList(){
+  catalog.sort((a,b)=>a.name.localeCompare(b.name,'pl'));
   const el=document.getElementById('mg-catalog-list');
   if(!el)return;
   if(!catalog.length){el.innerHTML='<div style="font-size:13px;color:var(--tx2);margin-bottom:8px">Brak produktów w katalogu.</div>';return;}
@@ -2639,7 +2685,7 @@ function openEditOrder(oid){
       <div class="lbl">Produkt z katalogu</div>
       <select id="eo-add-cat" style="margin-bottom:8px" onchange="onEoAddCatChange()">
         <option value="">— wybierz z katalogu —</option>
-        ${catalog.filter(c=>c.stockItem!==false).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
+        ${sortedCatalog().filter(c=>c.stockItem!==false).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
       </select>
       <div class="lbl">Lub wpisz własną nazwę</div>
       <input type="text" id="eo-add-custom" placeholder="np. Słupek betonowy" style="margin-bottom:8px" />
