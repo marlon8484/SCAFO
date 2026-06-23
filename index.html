@@ -2453,6 +2453,7 @@ function updateOrderItemStock(orderId, itemIdx, stockVal){
 }
 
 function addOrder(){
+  try{
   const client=document.getElementById('no-client').value.trim();
   const deadline=document.getElementById('no-deadline').value||null;
   const link=document.getElementById('no-link').value.trim()||null;
@@ -2505,6 +2506,11 @@ function addOrder(){
   renderNoItems();
   renderMgOrders();
   alert('Zamówienie dodane!');
+
+  } catch(err){
+    alert('Błąd podczas tworzenia zamówienia: '+err.message);
+    console.error(err);
+  }
 }
 
 let orderDetailPrevScreen='screen-manager';
@@ -2780,6 +2786,7 @@ function addEoItem(){
 }
 
 function saveEditOrder(){
+  try{
   const o=orders.find(x=>String(x.id)===String(editingOrderId));
   if(!o) return;
   const client=document.getElementById('eo-client').value.trim();
@@ -2804,6 +2811,11 @@ function saveEditOrder(){
   recalcOrderStocks();
   closeEditOrder();
   alert('Zamówienie zaktualizowane!');
+
+  } catch(err){
+    alert('Błąd podczas zapisywania zamówienia: '+err.message);
+    console.error(err);
+  }
 }
 
 function closeEditOrder(){
@@ -3814,6 +3826,17 @@ document.addEventListener('visibilitychange',()=>{
       }
     });
   }
+});
+
+// Global error handler to prevent app freeze
+window.addEventListener('error', function(e){
+  console.error('Global error:', e.message, e.filename, e.lineno);
+  showToast('Błąd: '+e.message, true);
+  return false;
+});
+window.addEventListener('unhandledrejection', function(e){
+  console.error('Unhandled promise rejection:', e.reason);
+  showToast('Błąd połączenia: '+(e.reason?.message||e.reason), true);
 });
 
 if("serviceWorker"in navigator){
