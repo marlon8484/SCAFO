@@ -2593,9 +2593,14 @@ function openOrderDetail(oid){
   const totalDone=orderDone(oid);
   const pp=pct(totalDone,o.target);
 
-  const doneBtn=`<button class="btn ${isDone?'btn-gray':'btn-blue'}" style="margin-bottom:12px;width:100%" onclick="toggleOrderStatus('${oid}');backFromOrderDetail()">
-    <i class="ti ti-${isDone?'refresh':'circle-check'}"></i> ${isDone?'Przywróć jako aktywne':'Oznacz jako zrealizowane'}
-  </button>`;
+  const doneBtn=`<div style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="btn ${isDone?'btn-gray':'btn-blue'}" style="flex:1;margin:0" onclick="toggleOrderStatus('${oid}');backFromOrderDetail()">
+      <i class="ti ti-${isDone?'refresh':'circle-check'}"></i> ${isDone?'Przywróć':'Zrealizowane'}
+    </button>
+    <button class="btn btn-green" style="flex:1;margin:0" onclick="openShipmentFromOrder('${oid}')">
+      <i class="ti ti-truck"></i> Wydaj
+    </button>
+  </div>`;
   document.getElementById('od-content').innerHTML=doneBtn+linkHtml+`
     <div class="card" style="margin-bottom:12px">
       <div class="row" style="margin-bottom:8px">
@@ -2622,6 +2627,23 @@ function toggleOdItem(id){
   const isOpen=el.style.display!=='none';
   el.style.display=isOpen?'none':'block';
   if(icon) icon.style.transform=isOpen?'':'rotate(180deg)';
+}
+
+function openShipmentFromOrder(oid){
+  // Navigate to Magazyn -> Wydania and pre-select the order
+  show('screen-manager');
+  mTab('mag');
+  setTimeout(()=>{
+    magTab('wydania');
+    setTimeout(()=>{
+      openMgrShipmentForm();
+      const sel=document.getElementById('mg-sh-order');
+      if(sel){
+        sel.value=oid;
+        sel.dispatchEvent(new Event('change'));
+      }
+    },100);
+  },100);
 }
 
 function backFromOrderDetail(){
