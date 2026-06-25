@@ -3417,8 +3417,12 @@ function renderMgrShItems(){
 function printShipment(shipmentId){
   const s=shipments.find(x=>x.id==shipmentId);
   if(!s) return;
-  const el=document.getElementById('print-area');
-  if(!el){alert('Błąd: brak obszaru drukowania.');return;}
+  let el=document.getElementById('print-area');
+  if(!el){
+    el=document.createElement('div');
+    el.id='print-area';
+    document.body.appendChild(el);
+  }
   const dateStr=s.date||today();
   const itemsHtml=s.items.map((item,i)=>`
     <tr>
