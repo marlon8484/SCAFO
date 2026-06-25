@@ -3414,6 +3414,67 @@ function renderMgrShItems(){
   el.innerHTML=mgShItems.map((item,i)=>`<div class="ri" style="padding:5px 0"><div class="row"><span style="font-size:13px">${item.name} — ${item.qty} ${item.unit}</span><button class="btn btn-gray btn-sm" onclick="mgShItems.splice(${i},1);renderMgrShItems()"><i class="ti ti-x"></i></button></div></div>`).join('');
 }
 
+function printShipment(shipmentId){
+  const s=shipments.find(x=>x.id==shipmentId);
+  if(!s) return;
+  const el=document.getElementById('print-area');
+  if(!el){alert('Błąd: brak obszaru drukowania.');return;}
+  const dateStr=s.date||today();
+  const itemsHtml=s.items.map((item,i)=>`
+    <tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee">${i+1}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee">${item.name}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${item.qty}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${item.unit||'szt.'}</td>
+    </tr>`).join('');
+  el.innerHTML=`
+    <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;color:#111">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
+        <div>
+          <div style="font-size:22px;font-weight:700;margin-bottom:4px">SCAFO Produkcja</div>
+          <div style="font-size:13px;color:#666">Dokument wydania towaru</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:13px;color:#666">Nr dokumentu:</div>
+          <div style="font-size:15px;font-weight:600">WZ/${String(s.id).slice(-6)}</div>
+          <div style="font-size:13px;color:#666;margin-top:4px">Data wydania: <strong>${dateStr}</strong></div>
+        </div>
+      </div>
+      <div style="border:1px solid #ddd;border-radius:8px;padding:16px;margin-bottom:20px">
+        <div style="font-size:12px;color:#666;margin-bottom:4px">Odbiorca:</div>
+        <div style="font-size:18px;font-weight:600">${s.client}</div>
+        ${s.notes?`<div style="font-size:13px;color:#444;margin-top:8px">Uwagi: ${s.notes}</div>`:''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+        <thead>
+          <tr style="background:#185FA5;color:#fff">
+            <th style="padding:10px 12px;text-align:left;font-size:13px">Lp.</th>
+            <th style="padding:10px 12px;text-align:left;font-size:13px">Nazwa produktu</th>
+            <th style="padding:10px 12px;text-align:center;font-size:13px">Ilość</th>
+            <th style="padding:10px 12px;text-align:center;font-size:13px">Jedn.</th>
+          </tr>
+        </thead>
+        <tbody>${itemsHtml}</tbody>
+        <tfoot>
+          <tr style="background:#f5f5f3">
+            <td colspan="2" style="padding:10px 12px;font-weight:700">ŁĄCZNIE:</td>
+            <td style="padding:10px 12px;text-align:center;font-weight:700">${s.items.reduce((a,i)=>a+i.qty,0)}</td>
+            <td style="padding:10px 12px;text-align:center;font-weight:700">szt.</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="display:flex;justify-content:space-between;margin-top:40px">
+        <div style="text-align:center;width:200px">
+          <div style="border-top:1px solid #333;padding-top:8px;font-size:12px;color:#666">Wydał: ${s.confirmedBy||''}</div>
+        </div>
+        <div style="text-align:center;width:200px">
+          <div style="border-top:1px solid #333;padding-top:8px;font-size:12px;color:#666">Odebrał / Podpis</div>
+        </div>
+      </div>
+    </div>`;
+  window.print();
+}
+
 function confirmMgrShipment(){
   const orderId=document.getElementById('mg-sh-order').value;
   if(!orderId){alert('Wybierz zamówienie.');return;}
