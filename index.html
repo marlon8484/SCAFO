@@ -919,9 +919,8 @@ function save(){
   localStorage.setItem('pa6_vacations',JSON.stringify(vacations));
   localStorage.setItem('pa6_reports',JSON.stringify(reports));
   localStorage.setItem('pa6_payouts',JSON.stringify(payouts));
-  // debounced cloud save
-  if(saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout=setTimeout(()=>supaSave(),1500);
+  // immediate cloud save
+  supaSave();
 }
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);}
 function today(){return new Date().toLocaleDateString('pl-PL');}
@@ -2070,7 +2069,7 @@ function toggleMgrAddReport(){
     wSel.innerHTML=workers.map(w=>`<option value="${w.name}">${w.name}</option>`).join('');
     document.getElementById('mgr-rep-date').value=new Date().toISOString().slice(0,10);
     const catSel=document.getElementById('mgr-rep-cat');
-    catSel.innerHTML=catalog.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    catSel.innerHTML=[...catalog].sort((a,b)=>a.name.localeCompare(b.name,'pl')).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
     const orderSel=document.getElementById('mgr-rep-order');
     orderSel.innerHTML=orders.filter(o=>o.status==='active').map(o=>`<option value="${o.id}">${o.client}</option>`).join('');
     orderSel.onchange=()=>{
@@ -2713,7 +2712,7 @@ function openEditOrder(oid){
       <div class="lbl">Produkt z katalogu</div>
       <select id="eo-add-cat" style="margin-bottom:8px" onchange="onEoAddCatChange()">
         <option value="">— wybierz z katalogu —</option>
-        ${sortedCatalog().filter(c=>c.stockItem!==false).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
+        ${[...catalog].sort((a,b)=>a.name.localeCompare(b.name,'pl')).filter(c=>c.stockItem!==false).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
       </select>
       <div class="lbl">Lub wpisz własną nazwę</div>
       <input type="text" id="eo-add-custom" placeholder="np. Słupek betonowy" style="margin-bottom:8px" />
@@ -3327,7 +3326,7 @@ function openMgrShipmentForm(){
   const dateEl=document.getElementById('mg-sh-date');
   if(dateEl) dateEl.value=new Date().toISOString().slice(0,10);
   const customCat=document.getElementById('mg-sh-custom-cat');
-  if(customCat) customCat.innerHTML='<option value="">— wybierz z katalogu —</option>'+catalog.map(c=>`<option value="${c.id}" data-name="${c.name}" data-unit="${c.unit}">${c.name}</option>`).join('');
+  if(customCat) customCat.innerHTML='<option value="">— wybierz z katalogu —</option>'+[...catalog].sort((a,b)=>a.name.localeCompare(b.name,'pl')).map(c=>`<option value="${c.id}" data-name="${c.name}" data-unit="${c.unit}">${c.name}</option>`).join('');
   const sel=document.getElementById('mg-sh-order');
   sel.innerHTML='<option value="">— wybierz zamówienie —</option>';
   orders.filter(o=>o.status==='active').forEach(o=>sel.innerHTML+=`<option value="${o.id}">${o.client}${o.deadline?' · '+new Date(o.deadline).toLocaleDateString('pl-PL'):''}</option>`);
