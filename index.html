@@ -3445,7 +3445,10 @@ function renderMgShipments(){
   el.innerHTML=shipments.slice(0,30).map(s=>`<div class="card" style="margin-bottom:8px;padding:10px 14px">
     <div class="row" style="margin-bottom:6px">
       <div><div style="font-size:13px;font-weight:500">${s.client}</div><div style="font-size:12px;color:var(--tx2)">${s.date} ${s.time} · ${s.confirmedBy}</div></div>
-      <span class="badge b-green">Wydano</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span class="badge b-green">Wydano</span>
+        <button class="btn btn-gray btn-sm" onclick="printShipment(${s.id})" title="Drukuj WZ"><i class="ti ti-printer"></i></button>
+      </div>
     </div>
     ${s.items.map(i=>`<div style="font-size:12px;color:var(--tx2);padding:2px 0"><i class="ti ti-package" style="font-size:12px;vertical-align:-1px"></i> ${i.name} — ${i.qty} ${i.unit}</div>`).join('')}
     ${s.notes?`<div style="font-size:12px;color:var(--tx2);margin-top:4px">${s.notes}</div>`:''}
