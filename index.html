@@ -2137,6 +2137,16 @@ function saveMgrReport(){
   }
 }
 
+function clearMgReportFilters(){
+  const f=document.getElementById('mg-date-from');
+  const t=document.getElementById('mg-date-to');
+  const w=document.getElementById('mg-worker-filter');
+  if(f) f.value='';
+  if(t) t.value='';
+  if(w) w.value='';
+  renderMgReports();
+}
+
 function renderMgReports(){
   // Populate worker filter
   const wSel=document.getElementById('mg-worker-filter');
