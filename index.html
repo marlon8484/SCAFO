@@ -3989,6 +3989,36 @@ function importData(event){
   event.target.value='';
 }
 
+function updateNewReportsBadge(){
+  try{
+    const count=reports.filter(r=>r.seenByManager===false).length;
+    const btn=document.getElementById('mn-raporty');
+    if(!btn) return;
+    const existing=btn.querySelector('.new-badge');
+    if(existing) existing.remove();
+    if(count>0){
+      const badge=document.createElement('span');
+      badge.className='new-badge';
+      badge.textContent=count;
+      badge.style.cssText='background:#E24B4A;color:#fff;border-radius:8px;font-size:10px;font-weight:700;padding:1px 5px;margin-left:4px;vertical-align:middle';
+      btn.appendChild(badge);
+    }
+  }catch(e){console.error('updateNewReportsBadge:',e);}
+}
+
+function checkBackupReminder(){
+  try{
+    const lastBackup=localStorage.getItem('scafo_last_backup')||'';
+    const todayStr=today();
+    if(lastBackup!==todayStr){
+      setTimeout(()=>{
+        showToast('💾 Pamiętaj o eksporcie danych!',true);
+        supaBackup();
+      },5000);
+    }
+  }catch(e){console.error('checkBackupReminder:',e);}
+}
+
 function renderManager(){updateNewReportsBadge();checkBackupReminder();renderMgEarn();renderMgPayouts();renderMgReports();renderMgMag();renderMgRates();renderMgWorkers();renderMgOrders();}
 
 function mTab(tab){
