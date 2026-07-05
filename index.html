@@ -3449,7 +3449,7 @@ function confirmShipment(){
   const o=orders.find(x=>x.id==orderId);
   shipments.unshift({id:Date.now(),orderId,client:o?o.client:'',items:JSON.parse(JSON.stringify(shItems)),notes,date:today(),time:new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}),confirmedBy:currentUser.name,confirmed:true});
   shItems=[];
-  // check if order fully shipped
+  // check if order fully shipped 
   if(o&&o.items){
     const allDone=o.items.every(i=>{
       const shipped=orderShipped(o.id,i.catId,i.name);
