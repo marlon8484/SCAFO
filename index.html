@@ -1247,7 +1247,7 @@ function loginManager(){
   show('screen-manager');
 }
 
-function logout(){currentUser=null;document.getElementById('login-user').value='';showLogin();}
+function logout(){currentUser=null;const lu=document.getElementById('login-user');if(lu)lu.value='';showLogin();}
 
 // Init: load from Supabase, fall back to localStorage
 (async()=>{
