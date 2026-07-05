@@ -613,6 +613,13 @@ textarea{resize:none;height:56px}
       <button class="tab" id="ut-stawki" onclick="uTab('stawki')">Stawki</button>
       <button class="tab" id="ut-prod" onclick="uTab('prod')">Produkty</button>
     </div>
+    <div class="sec-title">Backupy automatyczne</div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:13px;margin-bottom:10px">Backup tworzony automatycznie każdego dnia po zalogowaniu. Możesz przywrócić dane z poprzedniego dnia.</div>
+      <button class="btn btn-gray" onclick="listSupaBackups()"><i class="ti ti-cloud-download"></i> Pokaż backupy w chmurze</button>
+      <div id="backup-list" style="margin-top:10px"></div>
+    </div>
+    <div class="sec-title">Eksport / Import</div>
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button class="btn btn-gray" style="flex:1;margin:0" onclick="exportData()"><i class="ti ti-download"></i> Eksport danych</button>
       <button class="btn btn-gray" style="flex:1;margin:0" onclick="document.getElementById('import-file').click()"><i class="ti ti-upload"></i> Import danych</button>
@@ -796,7 +803,7 @@ async function supaTest(){
   resultEl.innerHTML+='<br><button onclick="this.parentElement.remove()">Zamknij</button>';
 }
 
-async function supaLoad(){
+async function supaLoad(retry=0){
   try{
     const res=await fetch(`${SUPA_URL}/rest/v1/scafo_data?id=eq.main&select=*`,{
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
@@ -805,36 +812,165 @@ async function supaLoad(){
     const rows=await res.json();
     if(rows&&rows.length>0){
       const d=rows[0];
-      if(d.workers) workers=d.workers;
-      if(d.catalog) catalog=d.catalog;
-      if(d.projects) projects=d.projects;
-      if(d.orders) orders=d.orders;
-      if(d.reports) reports=d.reports;
-      if(d.payouts) payouts=d.payouts;
-      if(d.shipments) shipments=d.shipments;
-      if(d.transports) transports=d.transports;
-      if(d.adjustments) adjustments=d.adjustments;
-      if(d.vacations) vacations=d.vacations;
-      // also sync to localStorage as backup
-      localStorage.setItem('pa6_workers',JSON.stringify(workers));
-      localStorage.setItem('pa6_catalog',JSON.stringify(catalog));
-      localStorage.setItem('pa6_projects',JSON.stringify(projects));
-      localStorage.setItem('pa6_orders',JSON.stringify(orders));
-      localStorage.setItem('pa6_reports',JSON.stringify(reports));
-      localStorage.setItem('pa6_payouts',JSON.stringify(payouts));
-      localStorage.setItem('pa6_shipments',JSON.stringify(shipments));
-      localStorage.setItem('pa6_transports',JSON.stringify(transports));
-      localStorage.setItem('pa6_adjustments',JSON.stringify(adjustments));
-      localStorage.setItem('pa6_vacations',JSON.stringify(vacations));
+      // Only update if Supabase has MORE data than localStorage (prevent overwrite with empty)
+      const localWorkers=JSON.parse(localStorage.getItem('pa6_workers')||'[]');
+      const supaWorkers=d.workers||[];
+      // Use whichever has more workers (Supabase or local)
+      if(supaWorkers.length>=localWorkers.length){
+        if(d.workers&&d.workers.length>0) workers=d.workers;
+        if(d.catalog&&d.catalog.length>0) catalog=d.catalog;
+        if(d.projects) projects=d.projects;
+        if(d.orders) orders=d.orders;
+        if(d.reports) reports=d.reports;
+        if(d.payouts) payouts=d.payouts;
+        if(d.shipments) shipments=d.shipments;
+        if(d.transports) transports=d.transports;
+        if(d.adjustments) adjustments=d.adjustments;
+        if(d.vacations) vacations=d.vacations;
+        // sync to localStorage as backup
+        localStorage.setItem('pa6_workers',JSON.stringify(workers));
+        localStorage.setItem('pa6_catalog',JSON.stringify(catalog));
+        localStorage.setItem('pa6_projects',JSON.stringify(projects));
+        localStorage.setItem('pa6_orders',JSON.stringify(orders));
+        localStorage.setItem('pa6_reports',JSON.stringify(reports));
+        localStorage.setItem('pa6_payouts',JSON.stringify(payouts));
+        localStorage.setItem('pa6_shipments',JSON.stringify(shipments));
+        localStorage.setItem('pa6_transports',JSON.stringify(transports));
+        localStorage.setItem('pa6_adjustments',JSON.stringify(adjustments));
+        localStorage.setItem('pa6_vacations',JSON.stringify(vacations));
+      } else {
+        // Local has more data - keep local and push to Supabase
+        console.warn('Local data newer than Supabase, using local');
+        setTimeout(()=>supaSave(),2000);
+      }
+    } else if(retry<2){
+      // Empty response - retry after 3 seconds
+      console.warn('Supabase returned empty, retrying...');
+      await new Promise(r=>setTimeout(r,3000));
+      return supaLoad(retry+1);
     }
     return true;
   }catch(e){
     console.error('Supabase load error:',e);
+    if(retry<2){
+      await new Promise(r=>setTimeout(r,3000));
+      return supaLoad(retry+1);
+    }
     return false;
   }
 }
 
 let saveTimeout=null;
+async function supaBackup(){
+  try{
+    const today_str=today();
+    const backupKey='scafo_backup_'+today_str.replace(/\./g,'_');
+    // Check if backup for today already exists
+    const checkRes=await fetch(`${SUPA_URL}/rest/v1/scafo_backups?id=eq.${backupKey}&select=id`,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    if(checkRes.ok){
+      const rows=await checkRes.json();
+      if(rows&&rows.length>0){
+        console.log('Backup for today already exists');
+        return true;
+      }
+    }
+    // Create backup
+    const body={
+      id:backupKey,
+      date:today_str,
+      data:JSON.stringify({version:6,exportDate:today_str,workers,catalog,projects,orders,reports,payouts,shipments,transports,adjustments,vacations}),
+      created_at:new Date().toISOString()
+    };
+    await fetch(`${SUPA_URL}/rest/v1/scafo_backups`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPA_KEY,
+        'Authorization':'Bearer '+SUPA_KEY,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates,return=minimal'
+      },
+      body:JSON.stringify(body)
+    });
+    console.log('Daily backup created:', backupKey);
+    localStorage.setItem('scafo_last_backup', today_str);
+    return true;
+  }catch(e){
+    console.error('Backup error:',e);
+    return false;
+  }
+}
+
+async function listSupaBackups(){
+  const el=document.getElementById('backup-list');
+  if(!el) return;
+  el.innerHTML='<div style="font-size:12px;color:var(--tx2)">Ładowanie...</div>';
+  try{
+    const res=await fetch(`${SUPA_URL}/rest/v1/scafo_backups?select=id,date,created_at&order=date.desc&limit=10`,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    if(!res.ok) throw new Error('Failed');
+    const rows=await res.json();
+    if(!rows||!rows.length){
+      el.innerHTML='<div style="font-size:12px;color:var(--tx2)">Brak backupów w chmurze.</div>';
+      return;
+    }
+    el.innerHTML=rows.map(r=>`
+      <div class="ri" style="padding:6px 0">
+        <div class="row">
+          <div>
+            <div style="font-size:13px;font-weight:500">${r.date}</div>
+            <div style="font-size:11px;color:var(--tx2)">${new Date(r.created_at).toLocaleString('pl-PL')}</div>
+          </div>
+          <button class="btn btn-gray btn-sm" onclick="restoreSupaBackup('${r.id}')"><i class="ti ti-refresh"></i> Przywróć</button>
+        </div>
+      </div>`).join('');
+  }catch(e){
+    el.innerHTML='<div style="font-size:12px;color:#E24B4A">Błąd ładowania backupów.</div>';
+  }
+}
+
+async function restoreSupaBackup(backupId){
+  if(!confirm('Przywrócić dane z tego backupu? Aktualne dane zostaną zastąpione.')) return;
+  try{
+    const res=await fetch(`${SUPA_URL}/rest/v1/scafo_backups?id=eq.${backupId}&select=data`,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    const rows=await res.json();
+    if(!rows||!rows.length) throw new Error('Nie znaleziono backupu');
+    const data=JSON.parse(rows[0].data);
+    if(data.workers) workers=data.workers;
+    if(data.catalog) catalog=data.catalog;
+    if(data.projects) projects=data.projects;
+    if(data.orders) orders=data.orders;
+    if(data.reports) reports=data.reports;
+    if(data.payouts) payouts=data.payouts;
+    if(data.shipments) shipments=data.shipments;
+    if(data.transports) transports=data.transports;
+    if(data.adjustments) adjustments=data.adjustments;
+    if(data.vacations) vacations=data.vacations;
+    recalcOrderStocks();
+    save();
+    renderManager();
+    showToast('Dane przywrócone z backupu!');
+  }catch(e){
+    alert('Błąd przywracania: '+e.message);
+  }
+}
+
+function checkBackupReminder(){
+  const lastBackup=localStorage.getItem('scafo_last_backup')||'';
+  const todayStr=today();
+  if(lastBackup!==todayStr){
+    // Show reminder after 5 seconds
+    setTimeout(()=>{
+      showToast('💾 Pamiętaj o eksporcie danych!',true);
+      supaBackup();
+    },5000);
+  }
+}
+
 async function supaSave(){
   try{
     const body={
@@ -3853,7 +3989,7 @@ function importData(event){
   event.target.value='';
 }
 
-function renderManager(){renderMgEarn();renderMgPayouts();renderMgReports();renderMgMag();renderMgRates();renderMgWorkers();renderMgOrders();}
+function renderManager(){updateNewReportsBadge();checkBackupReminder();renderMgEarn();renderMgPayouts();renderMgReports();renderMgMag();renderMgRates();renderMgWorkers();renderMgOrders();}
 
 function mTab(tab){
   ['wyplaty','raporty','rapkal','mag','zam','ust'].forEach(t=>{
