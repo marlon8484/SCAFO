@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
@@ -3449,7 +3449,7 @@ function confirmShipment(){
   const o=orders.find(x=>x.id==orderId);
   shipments.unshift({id:Date.now(),orderId,client:o?o.client:'',items:JSON.parse(JSON.stringify(shItems)),notes,date:today(),time:new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}),confirmedBy:currentUser.name,confirmed:true});
   shItems=[];
-  // check if order fully shipped 
+  // check if order fully shipped
   if(o&&o.items){
     const allDone=o.items.every(i=>{
       const shipped=orderShipped(o.id,i.catId,i.name);
@@ -4019,7 +4019,7 @@ function checkBackupReminder(){
   }catch(e){console.error('checkBackupReminder:',e);}
 }
 
-function renderManager(){updateNewReportsBadge();checkBackupReminder();renderMgEarn();renderMgPayouts();renderMgReports();renderMgMag();renderMgRates();renderMgWorkers();renderMgOrders();}
+function renderManager(){if(typeof updateNewReportsBadge==='function')updateNewReportsBadge();if(typeof checkBackupReminder==='function')checkBackupReminder();renderMgEarn();renderMgPayouts();renderMgReports();renderMgMag();renderMgRates();renderMgWorkers();renderMgOrders();}
 
 function mTab(tab){
   ['wyplaty','raporty','rapkal','mag','zam','ust'].forEach(t=>{
