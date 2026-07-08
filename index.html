@@ -176,12 +176,15 @@ textarea{resize:none;height:72px;}
 // ══════════════════════════════════
 const SUPA_URL='https://orshwfdzvcyzqssvtxgn.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yc2h3ZmR6dmN5enFzc3Z0eGduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDk0OTQsImV4cCI6MjA5NjE4NTQ5NH0.2od9zzYaFb6vClzbznj9KC-FCOhW4cx8t44BvQ1OGdI';
-const SUPA_H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'};
+const SUPA_H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'};
 
 async function supaFetch(url,opts={}){
   const res=await fetch(SUPA_URL+url,{...opts,headers:{...SUPA_H,...(opts.headers||{})}});
-  if(!res.ok){const e=await res.text();throw new Error('Supabase '+res.status+': '+e);}
-  return res.status===204?null:res.json();
+  if(!res.ok){const e=await res.text().catch(()=>'');throw new Error('Supabase '+res.status+': '+e);}
+  if(res.status===204||res.status===201)return null;
+  const text=await res.text().catch(()=>'');
+  if(!text||!text.trim())return null;
+  try{return JSON.parse(text);}catch(e){return null;}
 }
 
 // ══════════════════════════════════
@@ -862,7 +865,7 @@ function mgSwitchTab(tab){
   if(tab==='orders')el.innerHTML=renderMgOrders();
   else if(tab==='reports')el.innerHTML=renderMgReports();
   else if(tab==='warehouse')el.innerHTML=renderMgWarehouse();
-  else if(tab==='payouts')el.innerHTML=renderMgPayouts();
+  else if(tab==='payouts'){el.innerHTML=renderMgPayouts();setTimeout(()=>paySwitch('summary'),10);}
   else if(tab==='workers')el.innerHTML=renderMgWorkers();
   else if(tab==='calendar')el.innerHTML=renderCalTab(true);
   else if(tab==='settings')el.innerHTML=renderMgSettings();
@@ -1434,41 +1437,191 @@ async function saveAdj(){
 // ══════════════════════════════════
 // MANAGER — PAYOUTS
 // ══════════════════════════════════
+let payoutTab='summary';
+
 function renderMgPayouts(){
   return`<div style="padding-bottom:20px">
+    <div class="tabs" style="padding:0 16px 12px">
+      <button class="tab active" id="pay-tab-summary" onclick="paySwitch('summary')">Podsumowanie</button>
+      <button class="tab" id="pay-tab-history" onclick="paySwitch('history')">Historia wypłat</button>
+    </div>
+    <div id="pay-content"></div>
+    
+    <!-- Modal wypłaty -->
+    <div id="modal-payout" class="modal-overlay"><div class="modal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="modal-title" style="margin:0">Dodaj wypłatę</div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-payout')"><i class="ti ti-x"></i></button>
+      </div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px" id="payout-worker-name"></div>
+      <div class="form-group"><label class="label">Kwota (zł)</label><input type="number" id="payout-amount" step="0.01" min="0" inputmode="decimal" placeholder="0.00"></div>
+      <div class="form-group"><label class="label">Data wypłaty</label><input type="date" id="payout-date" value="${todayISO()}"></div>
+      <div class="form-group"><label class="label">Uwagi</label><input type="text" id="payout-notes" placeholder="opcjonalne..."></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-success" style="flex:1" onclick="confirmPayout()"><i class="ti ti-cash"></i> Zapisz wypłatę</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="closeModal('modal-payout')">Anuluj</button>
+      </div>
+    </div></div>
+  </div>`;
+}
+
+function paySwitch(tab){
+  payoutTab=tab;
+  document.querySelectorAll('[id^="pay-tab-"]').forEach(b=>b.classList.toggle('active',b.id===`pay-tab-${tab}`));
+  const el=document.getElementById('pay-content');
+  if(!el)return;
+  if(tab==='summary')el.innerHTML=renderPaySummary();
+  else el.innerHTML=renderPayHistory();
+}
+
+function earnInRange(workerName, from, to){
+  return DB.reports.filter(r=>{
+    if(r.user!==workerName)return false;
+    if(!from&&!to)return true;
+    const p=r.date?.split('.');
+    if(p?.length!==3)return true;
+    const d=new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0]));
+    if(from&&d<new Date(from))return false;
+    if(to){const te=new Date(to);te.setHours(23,59,59);if(d>te)return false;}
+    return true;
+  }).reduce((a,r)=>a+earn(r),0);
+}
+
+function renderPaySummary(){
+  const from=document.getElementById('pay-from')?.value||'';
+  const to=document.getElementById('pay-to')?.value||'';
+  const totalEarned=DB.workers.reduce((a,w)=>a+earnInRange(w.name,from,to),0);
+  const totalPaid=DB.payouts.filter(p=>p.paid).reduce((a,p)=>a+p.amount,0);
+  const totalDue=DB.workers.reduce((a,w)=>{
+    const earned=DB.reports.filter(r=>r.user===w.name).reduce((s,r)=>s+earn(r),0);
+    const paid=DB.payouts.filter(p=>p.worker===w.name&&p.paid).reduce((s,p)=>s+p.amount,0);
+    return a+Math.max(0,earned-paid);
+  },0);
+
+  return`<div>
+    <!-- Filtry dat -->
+    <div class="card">
+      <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:8px">FILTR ZAROBKÓW WG DAT</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div style="flex:1"><label class="label">Od</label><input type="date" id="pay-from" onchange="renderPaySummaryRefresh()"></div>
+        <div style="flex:1"><label class="label">Do</label><input type="date" id="pay-to" onchange="renderPaySummaryRefresh()"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pay-from').value='';document.getElementById('pay-to').value='';renderPaySummaryRefresh()"><i class="ti ti-x"></i> Wyczyść</button>
+    </div>
+    
+    <!-- Łączne podsumowanie -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 16px 12px">
+      <div class="earn-stat"><div class="earn-stat-val">${fmt(totalEarned)}</div><div class="earn-stat-label">${from||to?'Zarobiono (filtr)':'Zarobiono łącznie'}</div></div>
+      <div class="earn-stat"><div class="earn-stat-val">${fmt(totalPaid)}</div><div class="earn-stat-label">Wypłacono łącznie</div></div>
+      <div class="earn-stat"><div class="earn-stat-val" style="color:var(--red)">${fmt(totalDue)}</div><div class="earn-stat-label">Do wypłaty</div></div>
+    </div>
+    
+    <!-- Per pracownik -->
+    <div class="section"><div class="section-title">Pracownicy</div></div>
     ${DB.workers.map(w=>{
-      const earned=DB.reports.filter(r=>r.user===w.name).reduce((a,r)=>a+earn(r),0);
+      const earned=earnInRange(w.name,from,to);
+      const earnedAll=DB.reports.filter(r=>r.user===w.name).reduce((a,r)=>a+earn(r),0);
       const paid=DB.payouts.filter(p=>p.worker===w.name&&p.paid).reduce((a,p)=>a+p.amount,0);
-      const due=Math.max(0,earned-paid);
+      const due=Math.max(0,earnedAll-paid);
       return`<div class="card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <div class="avatar avatar-sm">${initials(w.name)}</div>
-          <div style="flex:1;font-weight:600">${w.name}</div>
+          <div style="flex:1">
+            <div style="font-weight:600">${w.name}</div>
+            <div style="font-size:11px;color:var(--tx2)">${w.role==='piecework'?'Akordowy':w.role==='manager'?'Manager':'Poranny'}</div>
+          </div>
           <div style="text-align:right">
             <div style="font-size:18px;font-weight:700;color:${due>0?'var(--red)':'var(--green)'}">${fmt(due)} zł</div>
             <div style="font-size:11px;color:var(--tx2)">do wypłaty</div>
           </div>
         </div>
-        <div style="font-size:12px;color:var(--tx2);margin-bottom:8px">Zarobiono: ${fmt(earned)} zł · Wypłacono: ${fmt(paid)} zł</div>
-        ${due>0?`<button class="btn btn-success btn-block" onclick="markPayout('${w.name}',${due})"><i class="ti ti-cash"></i> Wypłać ${fmt(due)} zł</button>`:''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;font-size:12px">
+          <div style="background:var(--bg3);border-radius:var(--rsm);padding:8px;text-align:center">
+            <div style="font-weight:700;color:var(--green)">${fmt(earned)} zł</div>
+            <div style="color:var(--tx2)">${from||to?'Zarobki (filtr)':'Zarobki łącznie'}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:var(--rsm);padding:8px;text-align:center">
+            <div style="font-weight:700">${fmt(paid)} zł</div>
+            <div style="color:var(--tx2)">Wypłacono</div>
+          </div>
+        </div>
+        <button class="btn btn-success btn-block" onclick="openPayoutModal('${w.name}',${due})">
+          <i class="ti ti-cash"></i> Dodaj wypłatę${due>0?` (saldo: ${fmt(due)} zł)`:''}
+        </button>
       </div>`;
     }).join('')}
-    ${DB.payouts.length?`
-      <div class="section"><div class="section-title">Historia</div></div>
-      ${DB.payouts.slice(0,20).map(p=>`<div class="item">
-        <div class="item-main"><div class="item-title">${p.worker}</div><div class="item-sub">${p.date}</div></div>
-        <div style="font-weight:600;color:var(--green)">${fmt(p.amount)} zł</div>
-      </div>`).join('')}
-    `:''}
   </div>`;
 }
 
-async function markPayout(worker,amount){
-  if(!confirm(`Oznaczyć wypłatę ${fmt(amount)} zł dla ${worker}?`))return;
-  DB.payouts.unshift({id:uid(),worker,amount,date:today(),paid:true,paidAt:todayISO()});
+function renderPaySummaryRefresh(){
+  const el=document.getElementById('pay-content');
+  if(el)el.innerHTML=renderPaySummary();
+}
+
+function renderPayHistory(){
+  const sorted=[...DB.payouts].sort((a,b)=>{
+    const da=new Date(a.paidAt||plToISO(a.date)||'2000-01-01');
+    const db=new Date(b.paidAt||plToISO(b.date)||'2000-01-01');
+    return db-da;
+  });
+  if(!sorted.length)return`<div class="empty"><i class="ti ti-cash"></i><p>Brak historii wypłat</p></div>`;
+  
+  // Group by worker
+  const byW={};
+  sorted.forEach(p=>{if(!byW[p.worker])byW[p.worker]=[];byW[p.worker].push(p);});
+  
+  return`<div>
+    ${Object.entries(byW).map(([worker,pays])=>{
+      const total=pays.reduce((a,p)=>a+p.amount,0);
+      return`<div class="section"><div class="section-title">${worker} · ${fmt(total)} zł łącznie</div></div>
+      ${pays.map(p=>`<div class="item">
+        <div class="item-main">
+          <div class="item-title">${p.date}</div>
+          <div class="item-sub">${p.notes||'Wypłata'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-weight:700;color:var(--green)">${fmt(p.amount)} zł</div>
+          <button class="btn btn-ghost btn-sm" onclick="delPayout(${p.id})"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>`).join('')}`;
+    }).join('')}
+  </div>`;
+}
+
+let _payoutWorker='';
+
+function openPayoutModal(worker, due){
+  _payoutWorker=worker;
+  document.getElementById('payout-worker-name').textContent=worker;
+  document.getElementById('payout-amount').value=due>0?due.toFixed(2):'';
+  document.getElementById('payout-date').value=todayISO();
+  document.getElementById('payout-notes').value='';
+  openModal('modal-payout');
+}
+
+async function confirmPayout(){
+  const amount=parseFloat(document.getElementById('payout-amount').value)||0;
+  if(amount<=0){showToast('Podaj kwotę',true);return;}
+  const dateVal=document.getElementById('payout-date').value;
+  const date=dateVal?isoToPL(dateVal):today();
+  const notes=document.getElementById('payout-notes').value.trim();
+  DB.payouts.unshift({id:uid(),worker:_payoutWorker,amount,date,notes,paid:true,paidAt:dateVal||todayISO()});
+  closeModal('modal-payout');
   const ok=await save();
-  showToast(ok?'Wypłata oznaczona!':'Zapisano lokalnie',!ok);
+  showToast(ok?'Wypłata zapisana!':'Zapisano lokalnie',!ok);
   mgSwitchTab('payouts');
+}
+
+async function delPayout(pid){
+  if(!confirm('Usunąć wypłatę?'))return;
+  DB.payouts=DB.payouts.filter(x=>x.id!=pid);
+  const ok=await save();
+  showToast(ok?'Usunięto':'Błąd',!ok);
+  mgSwitchTab('payouts');
+}
+
+async function markPayout(worker,amount){
+  openPayoutModal(worker,amount);
 }
 
 // ══════════════════════════════════
