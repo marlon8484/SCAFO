@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>SCAFO produkcja</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="/SCAFO/manifest.json">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -261,7 +264,7 @@ async function doBackup(){
     const key=`bk_${now.getFullYear()}_${now.getMonth()+1}_${now.getDate()}_${now.getHours()}`;
     const last=localStorage.getItem('scafo_last_bk');
     if(last===key)return;
-    await supaFetch('/rest/v1/scafo_backups',{method:'POST',body:JSON.stringify({id:key,date:today(),hour:now.getHours(),data:JSON.stringify(DB),created_at:now.toISOString()})});
+    await supaFetch('/rest/v1/scafo_backups',{method:'POST',body:JSON.stringify({id:key,date:today(),data:JSON.stringify(DB),created_at:now.toISOString()})});
     localStorage.setItem('scafo_last_bk',key);
   }catch(e){console.warn('Backup failed:',e);}
 }
@@ -1927,7 +1930,12 @@ async function importData(e){
   renderLogin();
 })();
 
-if('serviceWorker'in navigator)navigator.serviceWorker.register('/SCAFO/sw.js').catch(()=>{});
+// Wyrejestruj wszystkie stare service workery (powodowały cache problemy)
+if('serviceWorker'in navigator){
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(r=>r.unregister());
+  });
+}
 
 window.addEventListener('error',e=>{
   console.error('Error:',e.message,e.lineno);
