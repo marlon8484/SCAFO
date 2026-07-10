@@ -652,7 +652,8 @@ function buildWorkerScreen(){
         <button class="tab" id="w-tab-orders" onclick="wSwitch('orders')">Zamówienia</button>
         <button class="tab" id="w-tab-earn" onclick="wSwitch('earn')">Zarobki</button>
         <button class="tab" id="w-tab-piecework" onclick="wSwitch('piecework')">Akord</button>
-        <button class="tab" id="w-tab-calendar" onclick="wSwitch('calendar')">Kalendarz</button>
+        <button class="tab" id="w-tab-cal-akord" onclick="wSwitch('cal-akord')">Kal. Akord</button>
+        <button class="tab" id="w-tab-cal-std" onclick="wSwitch('cal-std')">Kal. Standard</button>
       </div>
       <div id="w-content" style="padding-top:12px"></div>
     </div>`;
@@ -667,7 +668,8 @@ function wSwitch(tab){
   else if(tab==='orders')el.innerHTML=renderWOrders();
   else if(tab==='earn')el.innerHTML=renderWEarnings();
   else if(tab==='piecework')el.innerHTML=renderPwEntry();
-  else if(tab==='calendar')el.innerHTML=renderCalTab(false);
+  else if(tab==='cal-akord')el.innerHTML=renderWorkerAkordCal();
+  else if(tab==='cal-std')el.innerHTML=renderWorkerStdCal();
 }
 
 function renderWReport(){
@@ -1693,13 +1695,270 @@ async function delWorker(wid){
 // ══════════════════════════════════
 // CALENDAR
 // ══════════════════════════════════
+// ══════════════════════════════════
+// CALENDAR HELPERS
+// ══════════════════════════════════
+let wAkordCalY=new Date().getFullYear(),wAkordCalM=new Date().getMonth();
+let wStdCalY=new Date().getFullYear(),wStdCalM=new Date().getMonth();
+
+function buildCalGrid(calY,calM,byDate,clickFn,dayRenderer){
+  const first=new Date(calY,calM,1),last=new Date(calY,calM+1,0);
+  const mn=first.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+  let sdow=first.getDay();if(sdow===0)sdow=7;
+  const tiso=todayISO();
+  let cells='';
+  for(let i=1;i<sdow;i++)cells+='<div></div>';
+  for(let d=1;d<=last.getDate();d++){
+    const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const data=byDate[ds];
+    const isT=ds===tiso;
+    cells+=`<div onclick="${clickFn}('${ds}')" style="min-height:52px;border-radius:var(--rsm);background:${data?'var(--bg3)':'var(--bg2)'};padding:3px;cursor:${data?'pointer':'default'};border:1.5px solid ${isT?'var(--blue)':'transparent'}">
+      <div style="font-size:11px;font-weight:500;color:${isT?'var(--blue)':'var(--tx)'}">${d}</div>
+      ${data?dayRenderer(data):''}
+    </div>`;
+  }
+  return {mn, cells};
+}
+
+// ══════════════════════════════════
+// WORKER CALENDAR — AKORD
+// ══════════════════════════════════
+function renderWorkerAkordCal(){
+  const calY=wAkordCalY,calM=wAkordCalM;
+  const myReps=DB.reports.filter(r=>r.user===currentUser.name&&r.shift==='popołudnie');
+  const byDate={};
+  myReps.forEach(r=>{
+    const p=r.date?.split('.');
+    const ds=p?.length===3?`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`:null;
+    if(!ds)return;
+    if(!byDate[ds])byDate[ds]={earn:0,qty:0,reps:[]};
+    byDate[ds].earn+=earn(r);
+    byDate[ds].qty+=r.qtyDone;
+    byDate[ds].reps.push(r);
+  });
+  const {mn,cells}=buildCalGrid(calY,calM,byDate,'wAkordDayClick',data=>`
+    <div style="font-size:9px;color:var(--tx2)">${data.qty} szt.</div>
+    ${data.earn>0?`<div style="font-size:9px;color:var(--green);font-weight:600">${fmt(data.earn)} zł</div>`:''}
+  `);
+  const monthKeys=Object.keys(byDate).filter(ds=>{const p=ds.split('-');return p.length===3&&parseInt(p[1])-1===calM&&parseInt(p[0])===calY;});
+  const monthEarn=monthKeys.reduce((a,ds)=>a+byDate[ds].earn,0);
+  const monthQty=monthKeys.reduce((a,ds)=>a+byDate[ds].qty,0);
+  return`<div style="padding:0 16px 20px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;margin-top:4px">
+      <div class="earn-stat"><div class="earn-stat-val">${fmt(monthEarn)} zł</div><div class="earn-stat-label">Zarobki w miesiącu</div></div>
+      <div class="earn-stat"><div class="earn-stat-val">${monthQty}</div><div class="earn-stat-label">Szt. w miesiącu</div></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <button class="btn btn-ghost btn-sm" onclick="wAkordCalPrev()"><i class="ti ti-chevron-left"></i></button>
+      <div class="cal-nav-title">${mn}</div>
+      <button class="btn btn-ghost btn-sm" onclick="wAkordCalNext()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px">
+      ${['Pn','Wt','Śr','Cz','Pt','Sb','Nd'].map(d=>`<div class="cal-day-name">${d}</div>`).join('')}${cells}
+    </div>
+    <div id="akord-day-detail" style="margin-top:8px"></div>
+    
+    <!-- Edit modal -->
+    <div id="modal-edit-akord" class="modal-overlay"><div class="modal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="modal-title" style="margin:0">Edytuj wpis akordowy</div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-edit-akord')"><i class="ti ti-x"></i></button>
+      </div>
+      <input type="hidden" id="akord-edit-id">
+      <div class="form-group"><label class="label">Produkt</label>
+        <select id="akord-edit-cat">${sortedCatalog('piecework').map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label class="label">Ilość (szt.)</label><input type="number" id="akord-edit-qty" min="1" inputmode="numeric"></div>
+      <div class="form-group"><label class="label">Data</label><input type="date" id="akord-edit-date"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="saveAkordEdit()"><i class="ti ti-check"></i> Zapisz</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAkordEntry()"><i class="ti ti-trash"></i></button>
+        <button class="btn btn-ghost" style="flex:1" onclick="closeModal('modal-edit-akord')">Anuluj</button>
+      </div>
+    </div></div>
+  </div>`;
+}
+
+function wAkordCalPrev(){wAkordCalM--;if(wAkordCalM<0){wAkordCalM=11;wAkordCalY--;}wSwitch('cal-akord');}
+function wAkordCalNext(){wAkordCalM++;if(wAkordCalM>11){wAkordCalM=0;wAkordCalY++;}wSwitch('cal-akord');}
+
+function wAkordDayClick(ds){
+  const el=document.getElementById('akord-day-detail');if(!el)return;
+  const reps=DB.reports.filter(r=>{
+    if(r.user!==currentUser.name||r.shift!=='popołudnie')return false;
+    const p=r.date?.split('.');
+    return p?.length===3&&`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`===ds;
+  });
+  if(!reps.length){el.innerHTML='';return;}
+  const date=new Date(ds).toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'});
+  const totalEarn=reps.reduce((a,r)=>a+earn(r),0);
+  const totalQty=reps.reduce((a,r)=>a+r.qtyDone,0);
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-weight:600;text-transform:capitalize">${date}</div>
+      ${totalEarn>0?`<div style="font-weight:700;color:var(--green)">${fmt(totalEarn)} zł</div>`:''}
+    </div>
+    ${reps.map(r=>`<div style="padding:10px 0;border-bottom:1px solid var(--bdr)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:500">${r.name}</div>
+          <div style="font-size:11px;color:var(--tx2)">${r.time}${earn(r)>0?' · '+fmt(earn(r))+' zł':''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:15px;font-weight:600">${r.qtyDone} szt.</div>
+          <button class="btn btn-ghost btn-sm" onclick="openAkordEdit(${r.id})"><i class="ti ti-pencil"></i></button>
+        </div>
+      </div>
+    </div>`).join('')}
+    <div style="font-size:12px;color:var(--tx2);margin-top:8px">Łącznie: ${totalQty} szt.</div>
+  </div>`;
+}
+
+function openAkordEdit(rid){
+  const r=DB.reports.find(x=>x.id==rid);if(!r)return;
+  document.getElementById('akord-edit-id').value=rid;
+  const catSel=document.getElementById('akord-edit-cat');
+  if(catSel&&r.catalogId){catSel.value=r.catalogId;}
+  document.getElementById('akord-edit-qty').value=r.qtyDone;
+  document.getElementById('akord-edit-date').value=plToISO(r.date);
+  openModal('modal-edit-akord');
+}
+
+async function saveAkordEdit(){
+  const rid=document.getElementById('akord-edit-id').value;
+  const r=DB.reports.find(x=>x.id==rid);if(!r)return;
+  const catId=document.getElementById('akord-edit-cat').value;
+  const c=DB.catalog.find(x=>String(x.id)===String(catId));
+  r.catalogId=catId;
+  r.name=c?.name||r.name;
+  r.qtyDone=parseInt(document.getElementById('akord-edit-qty').value)||r.qtyDone;
+  const d=document.getElementById('akord-edit-date').value;
+  if(d){r.date=isoToPL(d);}
+  closeModal('modal-edit-akord');
+  const ok=await save();
+  showToast(ok?'Zaktualizowano!':'Zapisano lokalnie',!ok);
+  wSwitch('cal-akord');
+}
+
+async function deleteAkordEntry(){
+  const rid=document.getElementById('akord-edit-id').value;
+  if(!confirm('Usunąć wpis?'))return;
+  DB.reports=DB.reports.filter(x=>x.id!=rid);
+  closeModal('modal-edit-akord');
+  const ok=await save();
+  showToast(ok?'Usunięto':'Błąd',!ok);
+  wSwitch('cal-akord');
+}
+
+// ══════════════════════════════════
+// WORKER CALENDAR — STANDARD
+// ══════════════════════════════════
+function renderWorkerStdCal(){
+  const calY=wStdCalY,calM=wStdCalM;
+  // Build events by ISO date
+  const byDate={};
+  const addEv=(ds,type,label)=>{if(!ds)return;if(!byDate[ds])byDate[ds]=[];byDate[ds].push({type,label});};
+
+  // My standard reports (rano or no shift) or any report linked to order/catalog
+  DB.reports.filter(r=>r.user===currentUser.name&&r.shift!=='popołudnie').forEach(r=>{
+    const p=r.date?.split('.');
+    const ds=p?.length===3?`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`:null;
+    if(ds)addEv(ds,'report',r.name);
+  });
+  // Order reports (zamówienia)
+  DB.reports.filter(r=>r.user===currentUser.name&&r.orderId).forEach(r=>{
+    const p=r.date?.split('.');
+    const ds=p?.length===3?`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`:null;
+    const o=DB.orders.find(x=>String(x.id)===String(r.orderId));
+    if(ds&&o)addEv(ds,'order',o.client);
+  });
+  // Order deadlines
+  DB.orders.forEach(o=>{if(o.deadline&&o.status==='active')addEv(o.deadline,'deadline',o.client);});
+  // Vacations for this user
+  DB.vacations.filter(v=>v.worker===currentUser.name).forEach(v=>{
+    const s=new Date(v.start),e=new Date(v.end);
+    for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1))addEv(d.toISOString().slice(0,10),'vacation','Urlop');
+  });
+
+  const first=new Date(calY,calM,1),last=new Date(calY,calM+1,0);
+  const mn=first.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+  let sdow=first.getDay();if(sdow===0)sdow=7;
+  const tiso=todayISO();
+  let cells='';
+  for(let i=1;i<sdow;i++)cells+='<div></div>';
+  for(let d=1;d<=last.getDate();d++){
+    const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const evs=byDate[ds]||[];
+    const isT=ds===tiso;
+    const dots=evs.slice(0,2).map(e=>`<div style="font-size:9px;border-radius:2px;padding:0 2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:${e.type==='deadline'?'#FAEEDA':e.type==='vacation'?'#EEEDFE':e.type==='order'?'#E1F5EE':'#E6F1FB'};color:${e.type==='deadline'?'#633806':e.type==='vacation'?'#3C3489':e.type==='order'?'#085041':'#0C447C'}">${e.label}</div>`).join('');
+    cells+=`<div onclick="wStdDayClick('${ds}')" style="min-height:52px;border-radius:var(--rsm);background:${evs.length?'var(--bg3)':'var(--bg2)'};padding:3px;cursor:${evs.length?'pointer':'default'};border:1.5px solid ${isT?'var(--blue)':'transparent'}">
+      <div style="font-size:11px;font-weight:500;color:${isT?'var(--blue)':'var(--tx)'}">${d}</div>${dots}
+    </div>`;
+  }
+  return`<div style="padding:0 16px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:4px">
+      <button class="btn btn-ghost btn-sm" onclick="wStdCalPrev()"><i class="ti ti-chevron-left"></i></button>
+      <div class="cal-nav-title">${mn}</div>
+      <button class="btn btn-ghost btn-sm" onclick="wStdCalNext()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;font-size:10px;flex-wrap:wrap">
+      <span style="background:#FAEEDA;color:#633806;padding:2px 6px;border-radius:4px">Termin zamówienia</span>
+      <span style="background:#E1F5EE;color:#085041;padding:2px 6px;border-radius:4px">Zamówienie</span>
+      <span style="background:#E6F1FB;color:#0C447C;padding:2px 6px;border-radius:4px">Raport</span>
+      <span style="background:#EEEDFE;color:#3C3489;padding:2px 6px;border-radius:4px">Urlop</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px">
+      ${['Pn','Wt','Śr','Cz','Pt','Sb','Nd'].map(d=>`<div class="cal-day-name">${d}</div>`).join('')}${cells}
+    </div>
+    <div id="std-day-detail" style="margin-top:8px"></div>
+  </div>`;
+}
+
+function wStdCalPrev(){wStdCalM--;if(wStdCalM<0){wStdCalM=11;wStdCalY--;}wSwitch('cal-std');}
+function wStdCalNext(){wStdCalM++;if(wStdCalM>11){wStdCalM=0;wStdCalY++;}wSwitch('cal-std');}
+
+function wStdDayClick(ds){
+  const el=document.getElementById('std-day-detail');if(!el)return;
+  const myReps=DB.reports.filter(r=>{
+    if(r.user!==currentUser.name)return false;
+    const p=r.date?.split('.');
+    return p?.length===3&&`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`===ds;
+  }).filter(r=>r.shift!=='popołudnie'||r.orderId);
+  const deadlines=DB.orders.filter(o=>o.deadline===ds&&o.status==='active');
+  const vacs=DB.vacations.filter(v=>v.worker===currentUser.name&&ds>=v.start&&ds<=v.end);
+  if(!myReps.length&&!deadlines.length&&!vacs.length){el.innerHTML='';return;}
+  const date=new Date(ds).toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'});
+  el.innerHTML=`<div class="card">
+    <div style="font-weight:600;margin-bottom:10px;text-transform:capitalize">${date}</div>
+    ${deadlines.map(o=>`<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span class="badge badge-amber" style="margin-right:6px">Termin</span>${o.client} · ${pct(orderTotalDone(o.id),o.target)}%</div>`).join('')}
+    ${vacs.map(()=>`<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span class="badge badge-purple" style="margin-right:6px">Urlop</span></div>`).join('')}
+    ${myReps.map(r=>{
+      const o=r.orderId?DB.orders.find(x=>String(x.id)===String(r.orderId)):null;
+      return`<div style="padding:8px 0;border-bottom:1px solid var(--bdr)">
+        <div style="display:flex;justify-content:space-between">
+          <div>
+            <div style="font-size:13px;font-weight:500">${r.name}</div>
+            ${o?`<div style="font-size:11px;color:var(--teal)">Zamówienie: ${o.client}</div>`:''}
+            <div style="font-size:11px;color:var(--tx2)">${r.shift} · ${r.time}</div>
+          </div>
+          <div style="font-size:14px;font-weight:600">${r.qtyDone} szt.</div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ══════════════════════════════════
+// MANAGER CALENDAR
+// ══════════════════════════════════
 function renderCalTab(isMgr=true){
   const calY=mgCalY,calM=mgCalM;
   const events={};
   const addEv=(ds,type,label)=>{if(!ds)return;if(!events[ds])events[ds]=[];events[ds].push({type,label});};
   DB.orders.forEach(o=>{if(o.deadline&&o.status==='active')addEv(o.deadline,'deadline',o.client);});
   DB.shipments.filter(s=>s.confirmed).forEach(s=>{if(s.date){const p=s.date.split('.');if(p.length===3)addEv(`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`,'shipment',s.client);}});
-  if(isMgr){const rds=[...new Set(DB.reports.map(r=>{if(!r.date)return null;const p=r.date.split('.');return p.length===3?`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`:null}).filter(Boolean))];rds.forEach(ds=>addEv(ds,'report','Raporty'));}
+  const rds=[...new Set(DB.reports.map(r=>{if(!r.date)return null;const p=r.date.split('.');return p.length===3?`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`:null}).filter(Boolean))];
+  rds.forEach(ds=>addEv(ds,'report','Raporty'));
   DB.vacations.forEach(v=>{const s=new Date(v.start),e=new Date(v.end);for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1))addEv(d.toISOString().slice(0,10),'vacation',v.worker);});
   const first=new Date(calY,calM,1),last=new Date(calY,calM+1,0);
   const mn=first.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
@@ -1715,7 +1974,22 @@ function renderCalTab(isMgr=true){
     cells+=`<div onclick="calDayClick('${ds}')" style="min-height:52px;border-radius:var(--rsm);background:${evs.length?'var(--bg3)':'var(--bg2)'};padding:3px;cursor:${evs.length?'pointer':'default'};border:1.5px solid ${isT?'var(--blue)':'transparent'}">
       <div style="font-size:11px;font-weight:500;color:${isT?'var(--blue)':'var(--tx)'}">${d}</div>${dots}</div>`;
   }
-  const vacForm=isMgr?`
+  return`<div style="padding:0 16px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:4px">
+      <button class="btn btn-ghost btn-sm" onclick="calPrev()"><i class="ti ti-chevron-left"></i></button>
+      <div class="cal-nav-title">${mn}</div>
+      <button class="btn btn-ghost btn-sm" onclick="calNext()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;font-size:10px;flex-wrap:wrap">
+      <span style="background:#FAEEDA;color:#633806;padding:2px 6px;border-radius:4px">Termin</span>
+      <span style="background:#E1F5EE;color:#085041;padding:2px 6px;border-radius:4px">Wydanie</span>
+      <span style="background:#E6F1FB;color:#0C447C;padding:2px 6px;border-radius:4px">Raporty</span>
+      <span style="background:#EEEDFE;color:#3C3489;padding:2px 6px;border-radius:4px">Urlop</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px">
+      ${['Pn','Wt','Śr','Cz','Pt','Sb','Nd'].map(d=>`<div class="cal-day-name">${d}</div>`).join('')}${cells}
+    </div>
+    <div id="cal-day-detail" style="margin-top:8px"></div>
     <div class="card" style="margin-top:12px">
       <div class="card-title">Zaplanuj urlop</div>
       <div class="form-group"><label class="label">Pracownik</label><select id="vac-wkr">${DB.workers.map(w=>`<option value="${w.name}">${w.name}</option>`).join('')}</select></div>
@@ -1726,29 +2000,11 @@ function renderCalTab(isMgr=true){
       <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="saveVac()"><i class="ti ti-beach"></i> Dodaj urlop</button>
     </div>
     ${DB.vacations.map(v=>`<div class="item"><div class="item-main"><div class="item-title">${v.worker}</div><div class="item-sub">${isoToPL(v.start)} – ${isoToPL(v.end)}</div></div><button class="btn btn-ghost btn-sm" onclick="delVac(${v.id})"><i class="ti ti-trash"></i></button></div>`).join('')}
-  `:'';
-  return`<div style="padding:0 16px 20px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:4px">
-      <button class="btn btn-ghost btn-sm" onclick="calPrev(${isMgr})"><i class="ti ti-chevron-left"></i></button>
-      <div class="cal-nav-title">${mn}</div>
-      <button class="btn btn-ghost btn-sm" onclick="calNext(${isMgr})"><i class="ti ti-chevron-right"></i></button>
-    </div>
-    <div style="display:flex;gap:6px;margin-bottom:8px;font-size:10px;flex-wrap:wrap">
-      <span style="background:#FAEEDA;color:#633806;padding:2px 6px;border-radius:4px">Termin</span>
-      <span style="background:#E1F5EE;color:#085041;padding:2px 6px;border-radius:4px">Wydanie</span>
-      ${isMgr?'<span style="background:#E6F1FB;color:#0C447C;padding:2px 6px;border-radius:4px">Raporty</span>':''}
-      <span style="background:#EEEDFE;color:#3C3489;padding:2px 6px;border-radius:4px">Urlop</span>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px">
-      ${['Pn','Wt','Śr','Cz','Pt','Sb','Nd'].map(d=>`<div class="cal-day-name">${d}</div>`).join('')}${cells}
-    </div>
-    <div id="cal-day-detail" style="margin-top:8px"></div>
-    ${vacForm}
   </div>`;
 }
 
-function calPrev(isMgr){mgCalM--;if(mgCalM<0){mgCalM=11;mgCalY--;}if(isMgr)mgSwitchTab('calendar');else wSwitch('calendar');}
-function calNext(isMgr){mgCalM++;if(mgCalM>11){mgCalM=0;mgCalY++;}if(isMgr)mgSwitchTab('calendar');else wSwitch('calendar');}
+function calPrev(){mgCalM--;if(mgCalM<0){mgCalM=11;mgCalY--;}mgSwitchTab('calendar');}
+function calNext(){mgCalM++;if(mgCalM>11){mgCalM=0;mgCalY++;}mgSwitchTab('calendar');}
 
 function calDayClick(ds){
   const el=document.getElementById('cal-day-detail');if(!el)return;
