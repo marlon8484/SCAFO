@@ -872,7 +872,7 @@ function mgSwitchTab(tab){
   else if(tab==='warehouse')el.innerHTML=renderMgWarehouse();
   else if(tab==='payouts'){el.innerHTML=renderMgPayouts();setTimeout(()=>paySwitch('summary'),10);}
   else if(tab==='workers')el.innerHTML=renderMgWorkers();
-  else if(tab==='calendar')el.innerHTML=renderCalTab(true);
+  else if(tab==='calendar'){el.innerHTML=renderMgCalContainer();setTimeout(()=>mgCalSwitch('std'),10);}
   else if(tab==='settings')el.innerHTML=renderMgSettings();
 }
 
@@ -1443,6 +1443,8 @@ async function saveAdj(){
 // MANAGER — PAYOUTS
 // ══════════════════════════════════
 let payoutTab='summary';
+let payFilterFrom='';
+let payFilterTo='';
 
 function renderMgPayouts(){
   return`<div style="padding-bottom:20px">
@@ -1493,8 +1495,8 @@ function earnInRange(workerName, from, to){
 }
 
 function renderPaySummary(){
-  const from=document.getElementById('pay-from')?.value||'';
-  const to=document.getElementById('pay-to')?.value||'';
+  const from=payFilterFrom;
+  const to=payFilterTo;
   const totalEarned=DB.workers.reduce((a,w)=>a+earnInRange(w.name,from,to),0);
   const totalPaid=DB.payouts.filter(p=>p.paid).reduce((a,p)=>a+p.amount,0);
   const totalDue=DB.workers.reduce((a,w)=>{
@@ -1508,10 +1510,10 @@ function renderPaySummary(){
     <div class="card">
       <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:8px">FILTR ZAROBKÓW WG DAT</div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
-        <div style="flex:1"><label class="label">Od</label><input type="date" id="pay-from" onchange="renderPaySummaryRefresh()"></div>
-        <div style="flex:1"><label class="label">Do</label><input type="date" id="pay-to" onchange="renderPaySummaryRefresh()"></div>
+        <div style="flex:1"><label class="label">Od</label><input type="date" id="pay-from" value="${payFilterFrom}" onchange="payFilterFrom=this.value;renderPaySummaryRefresh()"></div>
+        <div style="flex:1"><label class="label">Do</label><input type="date" id="pay-to" value="${payFilterTo}" onchange="payFilterTo=this.value;renderPaySummaryRefresh()"></div>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pay-from').value='';document.getElementById('pay-to').value='';renderPaySummaryRefresh()"><i class="ti ti-x"></i> Wyczyść</button>
+      <button class="btn btn-ghost btn-sm" onclick="payFilterFrom='';payFilterTo='';renderPaySummaryRefresh()"><i class="ti ti-x"></i> Wyczyść</button>
     </div>
     
     <!-- Łączne podsumowanie -->
@@ -1951,6 +1953,177 @@ function wStdDayClick(ds){
 // ══════════════════════════════════
 // MANAGER CALENDAR
 // ══════════════════════════════════
+let mgCalSubTab='std';
+
+function renderMgCalContainer(){
+  return`<div>
+    <div class="tabs" style="padding:0 16px 12px">
+      <button class="tab active" id="mgcal-tab-std" onclick="mgCalSwitch('std')">Standard</button>
+      <button class="tab" id="mgcal-tab-akord" onclick="mgCalSwitch('akord')">Akord</button>
+    </div>
+    <div id="mgcal-content"></div>
+  </div>`;
+}
+
+function mgCalSwitch(tab){
+  mgCalSubTab=tab;
+  document.querySelectorAll('[id^="mgcal-tab-"]').forEach(b=>b.classList.toggle('active',b.id===`mgcal-tab-${tab}`));
+  const el=document.getElementById('mgcal-content');
+  if(!el)return;
+  if(tab==='std')el.innerHTML=renderCalTab(true);
+  else el.innerHTML=renderMgAkordCal();
+}
+
+function renderMgAkordCal(){
+  const calY=mgCalY,calM=mgCalM;
+  // Group piecework reports by ISO date
+  const byDate={};
+  DB.reports.filter(r=>r.shift==='popołudnie').forEach(r=>{
+    const p=r.date?.split('.');
+    const ds=p?.length===3?`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`:null;
+    if(!ds)return;
+    if(!byDate[ds])byDate[ds]={earn:0,qty:0,reps:[]};
+    byDate[ds].earn+=earn(r);
+    byDate[ds].qty+=r.qtyDone;
+    byDate[ds].reps.push(r);
+  });
+  const first=new Date(calY,calM,1),last=new Date(calY,calM+1,0);
+  const mn=first.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+  let sdow=first.getDay();if(sdow===0)sdow=7;
+  const tiso=todayISO();
+  const monthKeys=Object.keys(byDate).filter(ds=>{const p=ds.split('-');return p.length===3&&parseInt(p[1])-1===calM&&parseInt(p[0])===calY;});
+  const monthEarn=monthKeys.reduce((a,ds)=>a+byDate[ds].earn,0);
+  const monthQty=monthKeys.reduce((a,ds)=>a+byDate[ds].qty,0);
+  let cells='';
+  for(let i=1;i<sdow;i++)cells+='<div></div>';
+  for(let d=1;d<=last.getDate();d++){
+    const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const data=byDate[ds];
+    const isT=ds===tiso;
+    cells+=`<div onclick="mgAkordDayClick('${ds}')" style="min-height:52px;border-radius:var(--rsm);background:${data?'var(--lgreen)':'var(--bg2)'};padding:3px;cursor:${data?'pointer':'default'};border:1.5px solid ${isT?'var(--blue)':'transparent'}">
+      <div style="font-size:11px;font-weight:500;color:${isT?'var(--blue)':'var(--tx)'}">${d}</div>
+      ${data?`<div style="font-size:9px;color:var(--tx2)">${data.qty} szt.</div><div style="font-size:9px;color:var(--green);font-weight:600">${fmt(data.earn)} zł</div>`:''}
+    </div>`;
+  }
+  return`<div style="padding:0 16px 20px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;margin-top:4px">
+      <div class="earn-stat"><div class="earn-stat-val">${fmt(monthEarn)} zł</div><div class="earn-stat-label">Zarobki w miesiącu</div></div>
+      <div class="earn-stat"><div class="earn-stat-val">${monthQty}</div><div class="earn-stat-label">Szt. w miesiącu</div></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <button class="btn btn-ghost btn-sm" onclick="mgAkordCalPrev()"><i class="ti ti-chevron-left"></i></button>
+      <div class="cal-nav-title">${mn}</div>
+      <button class="btn btn-ghost btn-sm" onclick="mgAkordCalNext()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px">
+      ${['Pn','Wt','Śr','Cz','Pt','Sb','Nd'].map(d=>`<div class="cal-day-name">${d}</div>`).join('')}${cells}
+    </div>
+    <div id="mgakord-day-detail" style="margin-top:8px"></div>
+    
+    <!-- Edit modal dla managera -->
+    <div id="modal-mgakord-edit" class="modal-overlay"><div class="modal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="modal-title" style="margin:0">Edytuj wpis akordowy</div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-mgakord-edit')"><i class="ti ti-x"></i></button>
+      </div>
+      <input type="hidden" id="mgakord-edit-id">
+      <div class="form-group"><label class="label">Pracownik</label><input type="text" id="mgakord-edit-worker" readonly style="background:var(--bg3)"></div>
+      <div class="form-group"><label class="label">Produkt</label>
+        <select id="mgakord-edit-cat">${sortedCatalog('piecework').map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label class="label">Ilość (szt.)</label><input type="number" id="mgakord-edit-qty" min="1" inputmode="numeric"></div>
+      <div class="form-group"><label class="label">Data</label><input type="date" id="mgakord-edit-date"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="saveMgAkordEdit()"><i class="ti ti-check"></i> Zapisz</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMgAkordEntry()"><i class="ti ti-trash"></i></button>
+        <button class="btn btn-ghost" style="flex:1" onclick="closeModal('modal-mgakord-edit')">Anuluj</button>
+      </div>
+    </div></div>
+  </div>`;
+}
+
+function mgAkordCalPrev(){mgCalM--;if(mgCalM<0){mgCalM=11;mgCalY--;}mgCalSwitch('akord');}
+function mgAkordCalNext(){mgCalM++;if(mgCalM>11){mgCalM=0;mgCalY++;}mgCalSwitch('akord');}
+
+function mgAkordDayClick(ds){
+  const el=document.getElementById('mgakord-day-detail');if(!el)return;
+  const reps=DB.reports.filter(r=>{
+    if(r.shift!=='popołudnie')return false;
+    const p=r.date?.split('.');
+    return p?.length===3&&`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`===ds;
+  });
+  if(!reps.length){el.innerHTML='';return;}
+  const date=new Date(ds).toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'});
+  const totalEarn=reps.reduce((a,r)=>a+earn(r),0);
+  const totalQty=reps.reduce((a,r)=>a+r.qtyDone,0);
+  // Group by worker
+  const byW={};
+  reps.forEach(r=>{if(!byW[r.user])byW[r.user]=[];byW[r.user].push(r);});
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-weight:600;text-transform:capitalize">${date}</div>
+      <div style="text-align:right">
+        <div style="font-weight:700;color:var(--green)">${fmt(totalEarn)} zł</div>
+        <div style="font-size:11px;color:var(--tx2)">${totalQty} szt.</div>
+      </div>
+    </div>
+    ${Object.entries(byW).map(([worker,wreps])=>`
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:4px">${worker}</div>
+        ${wreps.map(r=>`<div style="padding:8px 0;border-bottom:1px solid var(--bdr)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:13px;font-weight:500">${r.name}</div>
+              <div style="font-size:11px;color:var(--tx2)">${r.time}${earn(r)>0?' · '+fmt(earn(r))+' zł':''}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="font-size:14px;font-weight:600">${r.qtyDone} szt.</div>
+              <button class="btn btn-ghost btn-sm" onclick="openMgAkordEdit(${r.id})"><i class="ti ti-pencil"></i></button>
+            </div>
+          </div>
+        </div>`).join('')}
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+function openMgAkordEdit(rid){
+  const r=DB.reports.find(x=>x.id==rid);if(!r)return;
+  document.getElementById('mgakord-edit-id').value=rid;
+  document.getElementById('mgakord-edit-worker').value=r.user;
+  const catSel=document.getElementById('mgakord-edit-cat');
+  if(catSel&&r.catalogId)catSel.value=r.catalogId;
+  document.getElementById('mgakord-edit-qty').value=r.qtyDone;
+  document.getElementById('mgakord-edit-date').value=plToISO(r.date);
+  openModal('modal-mgakord-edit');
+}
+
+async function saveMgAkordEdit(){
+  const rid=document.getElementById('mgakord-edit-id').value;
+  const r=DB.reports.find(x=>x.id==rid);if(!r)return;
+  const catId=document.getElementById('mgakord-edit-cat').value;
+  const c=DB.catalog.find(x=>String(x.id)===String(catId));
+  r.catalogId=catId;
+  r.name=c?.name||r.name;
+  r.qtyDone=parseInt(document.getElementById('mgakord-edit-qty').value)||r.qtyDone;
+  const d=document.getElementById('mgakord-edit-date').value;
+  if(d)r.date=isoToPL(d);
+  closeModal('modal-mgakord-edit');
+  const ok=await save();
+  showToast(ok?'Zaktualizowano!':'Zapisano lokalnie',!ok);
+  mgCalSwitch('akord');
+}
+
+async function deleteMgAkordEntry(){
+  const rid=document.getElementById('mgakord-edit-id').value;
+  if(!confirm('Usunąć wpis?'))return;
+  DB.reports=DB.reports.filter(x=>x.id!=rid);
+  closeModal('modal-mgakord-edit');
+  const ok=await save();
+  showToast(ok?'Usunięto':'Błąd',!ok);
+  mgCalSwitch('akord');
+}
+
 function renderCalTab(isMgr=true){
   const calY=mgCalY,calM=mgCalM;
   const events={};
@@ -1960,6 +2133,7 @@ function renderCalTab(isMgr=true){
   const rds=[...new Set(DB.reports.map(r=>{if(!r.date)return null;const p=r.date.split('.');return p.length===3?`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`:null}).filter(Boolean))];
   rds.forEach(ds=>addEv(ds,'report','Raporty'));
   DB.vacations.forEach(v=>{const s=new Date(v.start),e=new Date(v.end);for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1))addEv(d.toISOString().slice(0,10),'vacation',v.worker);});
+  DB.payouts.filter(p=>p.paid&&p.paidAt).forEach(p=>addEv(p.paidAt,'payout',fmt(p.amount)+' zł'));
   const first=new Date(calY,calM,1),last=new Date(calY,calM+1,0);
   const mn=first.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
   let sdow=first.getDay();if(sdow===0)sdow=7;
@@ -1970,7 +2144,7 @@ function renderCalTab(isMgr=true){
     const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const evs=events[ds]||[];
     const isT=ds===tiso;
-    const dots=evs.slice(0,2).map(e=>`<div style="font-size:9px;border-radius:2px;padding:0 2px;background:${e.type==='deadline'?'#FAEEDA':e.type==='vacation'?'#EEEDFE':e.type==='report'?'#E6F1FB':'#E1F5EE'};color:${e.type==='deadline'?'#633806':e.type==='vacation'?'#3C3489':e.type==='report'?'#0C447C':'#085041'};overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${e.label}</div>`).join('');
+    const dots=evs.slice(0,3).map(e=>`<div style="font-size:9px;border-radius:2px;padding:0 2px;background:${e.type==='deadline'?'#FAEEDA':e.type==='vacation'?'#EEEDFE':e.type==='report'?'#E6F1FB':e.type==='payout'?'#EAF3DE':'#E1F5EE'};color:${e.type==='deadline'?'#633806':e.type==='vacation'?'#3C3489':e.type==='report'?'#0C447C':e.type==='payout'?'#3B6D11':'#085041'};overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${e.label}</div>`).join('');
     cells+=`<div onclick="calDayClick('${ds}')" style="min-height:52px;border-radius:var(--rsm);background:${evs.length?'var(--bg3)':'var(--bg2)'};padding:3px;cursor:${evs.length?'pointer':'default'};border:1.5px solid ${isT?'var(--blue)':'transparent'}">
       <div style="font-size:11px;font-weight:500;color:${isT?'var(--blue)':'var(--tx)'}">${d}</div>${dots}</div>`;
   }
@@ -1985,6 +2159,7 @@ function renderCalTab(isMgr=true){
       <span style="background:#E1F5EE;color:#085041;padding:2px 6px;border-radius:4px">Wydanie</span>
       <span style="background:#E6F1FB;color:#0C447C;padding:2px 6px;border-radius:4px">Raporty</span>
       <span style="background:#EEEDFE;color:#3C3489;padding:2px 6px;border-radius:4px">Urlop</span>
+      <span style="background:#EAF3DE;color:#3B6D11;padding:2px 6px;border-radius:4px">Wypłata</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px">
       ${['Pn','Wt','Śr','Cz','Pt','Sb','Nd'].map(d=>`<div class="cal-day-name">${d}</div>`).join('')}${cells}
@@ -2012,13 +2187,17 @@ function calDayClick(ds){
   const shs=DB.shipments.filter(s=>{if(!s.date)return false;const p=s.date.split('.');return p.length===3&&`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`===ds;});
   const vacs=DB.vacations.filter(v=>ds>=v.start&&ds<=v.end);
   const reps=DB.reports.filter(r=>{if(!r.date)return false;const p=r.date.split('.');return p.length===3&&`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`===ds;});
-  if(!deadlines.length&&!shs.length&&!vacs.length&&!reps.length){el.innerHTML='';return;}
+  const pays=DB.payouts.filter(p=>p.paid&&p.paidAt===ds);
+  if(!deadlines.length&&!shs.length&&!vacs.length&&!reps.length&&!pays.length){el.innerHTML='';return;}
   const date=new Date(ds).toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'});
+  const totalPay=pays.reduce((a,p)=>a+p.amount,0);
   el.innerHTML=`<div class="card">
     <div style="font-weight:600;margin-bottom:10px;text-transform:capitalize">${date}</div>
     ${deadlines.map(o=>`<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span class="badge badge-amber" style="margin-right:6px">Termin</span>${o.client} · ${pct(orderTotalDone(o.id),o.target)}%</div>`).join('')}
     ${shs.map(s=>`<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span class="badge badge-teal" style="margin-right:6px">Wydanie</span>${s.client}</div>`).join('')}
     ${vacs.map(v=>`<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span class="badge badge-purple" style="margin-right:6px">Urlop</span>${v.worker}</div>`).join('')}
+    ${pays.map(p=>`<div style="padding:6px 0;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center"><div><span class="badge badge-green" style="margin-right:6px">Wypłata</span>${p.worker}</div><div style="font-weight:700;color:var(--green)">${fmt(p.amount)} zł</div></div>`).join('')}
+    ${pays.length>1?`<div style="padding:6px 0;font-size:12px;font-weight:600;color:var(--green)">Łącznie wypłat: ${fmt(totalPay)} zł</div>`:''}
     ${reps.length?`<div style="padding:6px 0"><span class="badge badge-blue" style="margin-right:6px">Raporty</span>${reps.length} wpisów · ${reps.reduce((a,r)=>a+r.qtyDone,0)} szt.</div>`:''}
   </div>`;
 }
@@ -2073,6 +2252,15 @@ function renderMgSettings(){
       <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('imp-file').click()"><i class="ti ti-upload"></i> Import JSON</button>
     </div>
     <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(event)">
+    
+    <div class="section" style="margin-top:8px"><div class="section-title">Zerowanie</div></div>
+    <div style="padding:0 16px">
+      <div style="background:var(--lred);border-radius:var(--r);padding:14px;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600;color:var(--red);margin-bottom:6px">Zeruj magazyn</div>
+        <div style="font-size:12px;color:var(--tx2);margin-bottom:10px">Usuwa: wydania, korekty i raporty produkcji na stan (bez zamówienia). Raporty do zamówień zostają.</div>
+        <button class="btn btn-danger btn-block" onclick="clearWarehouse()"><i class="ti ti-trash"></i> Wyzeruj magazyn</button>
+      </div>
+    </div>
     
     <div id="modal-cat" class="modal-overlay"><div class="modal">
       <div class="modal-title" id="cat-form-title">Nowy produkt</div>
@@ -2149,6 +2337,16 @@ async function restoreBkp(bid){
     showToast('Dane przywrócone!');
     mgSwitchTab('settings');
   }catch(e){showToast('Błąd: '+e.message,true);}
+}
+
+async function clearWarehouse(){
+  if(!confirm('Wyzerować magazyn?\n\nZostaną usunięte:\n• Wszystkie wydania\n• Wszystkie korekty\n• Raporty produkcji na stan (bez zamówienia)\n\nRaporty do zamówień zostają.'))return;
+  DB.shipments=[];
+  DB.adjustments=[];
+  DB.reports=DB.reports.filter(r=>r.orderId);
+  const ok=await save();
+  showToast(ok?'Magazyn wyzerowany!':'Zapisano lokalnie',!ok);
+  mgSwitchTab('settings');
 }
 
 function exportData(){
