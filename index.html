@@ -510,10 +510,11 @@ function renderPwEntry(){
       </select>
       <input class="quick-qty" type="number" id="pw-qty" placeholder="0" inputmode="numeric" min="1" oninput="pwPreview()">
       <div class="quick-earn-preview" id="pw-preview"></div>
-      <select class="quick-select" id="pw-shift" style="margin-bottom:10px">
+      <select class="quick-select" id="pw-shift" style="margin-bottom:8px">
         <option value="popołudnie">Popołudnie (akord)</option>
         <option value="rano">Rano</option>
       </select>
+      <input type="date" id="pw-date" value="${todayISO()}" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:var(--rsm);color:#fff;padding:10px 12px;width:100%;font-size:14px;font-family:var(--font);margin-bottom:10px;-webkit-appearance:none;">
       <button class="btn btn-success btn-block" onclick="pwSave()"><i class="ti ti-check"></i> Zapisz wpis</button>
     </div>
     ${todayReps.length?`
@@ -546,7 +547,9 @@ async function pwSave(){
   if(!catId){showToast('Wybierz produkt',true);return;}
   if(qty<1){showToast('Podaj ilość',true);return;}
   const c=DB.catalog.find(x=>String(x.id)===String(catId));
-  DB.reports.unshift({id:uid(),user:currentUser.name,catalogId:String(catId),orderId:null,projectId:null,name:c?.name||'',qtyDone:qty,shift,date:today(),time:nowTime(),hours:null,notes:'',backdate:false,seenByManager:false});
+  const pwDateVal=document.getElementById('pw-date')?.value;
+  const pwDate=pwDateVal?isoToPL(pwDateVal):today();
+  DB.reports.unshift({id:uid(),user:currentUser.name,catalogId:String(catId),orderId:null,projectId:null,name:c?.name||'',qtyDone:qty,shift,date:pwDate,time:nowTime(),hours:null,notes:'',backdate:pwDate!==today(),seenByManager:false});
   const ok=await save();
   showToast(ok?'Zapisano! ✓':'Zapisano lokalnie',!ok);
   pwSwitch('entry');
