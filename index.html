@@ -574,7 +574,7 @@ function renderPwEarnings(){
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 16px 16px">
       <div class="earn-stat"><div class="earn-stat-val">${fmt(monthTotal)}</div><div class="earn-stat-label">Miesiąc zł</div></div>
       <div class="earn-stat"><div class="earn-stat-val">${fmt(allEarn)}</div><div class="earn-stat-label">Łącznie zł</div></div>
-      <div class="earn-stat"><div class="earn-stat-val" style="color:var(--red)">${fmt(allEarn-paid)}</div><div class="earn-stat-label">Do wypłaty</div></div>
+      <div class="earn-stat"><div class="earn-stat-val" style="color:var(--red)">${fmt(Math.max(0,allEarn-paid))}</div><div class="earn-stat-label">Do wypłaty</div></div>
     </div>
     ${buildEarnCal(byDate,calY,calM,'pw')}
     <div id="pw-day-detail"></div>
@@ -821,7 +821,7 @@ function renderWEarnings(){
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 16px 16px">
       <div class="earn-stat"><div class="earn-stat-val">${fmt(mt)}</div><div class="earn-stat-label">Miesiąc zł</div></div>
       <div class="earn-stat"><div class="earn-stat-val">${fmt(ae)}</div><div class="earn-stat-label">Łącznie zł</div></div>
-      <div class="earn-stat"><div class="earn-stat-val" style="color:var(--red)">${fmt(ae-paid)}</div><div class="earn-stat-label">Do wypłaty</div></div>
+      <div class="earn-stat"><div class="earn-stat-val" style="color:var(--red)">${fmt(Math.max(0,ae-paid))}</div><div class="earn-stat-label">Do wypłaty</div></div>
     </div>
     ${buildEarnCal(byDate,wCalY,wCalM,'w')}
     <div id="w-day-detail"></div>
