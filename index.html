@@ -1530,7 +1530,11 @@ function renderPaySummary(){
     <div class="section"><div class="section-title">Pracownicy</div></div>
     ${DB.workers.map(w=>{
       const earned=earnInRange(w.name,from,to);
-      const earnedAll=DB.reports.filter(r=>r.user===w.name).reduce((a,r)=>a+earn(r),0);
+      const earnedAll=DB.reports.filter(r=>r.user===w.name).reduce((a,r)=>{
+        const c=DB.catalog.find(x=>String(x.id)===String(r.catalogId));
+        const e=r.shift==='popołudnie'&&r.catalogId?Math.round(Number(c?.rate||0)*r.qtyDone*100)/100:0;
+        return a+e;
+      },0);
       const paid=DB.payouts.filter(p=>p.worker===w.name&&p.paid).reduce((a,p)=>a+p.amount,0);
       const due=Math.max(0,earnedAll-paid);
       return`<div class="card">
