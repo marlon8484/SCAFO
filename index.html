@@ -2323,10 +2323,10 @@ async function listBkp(){
   const el=document.getElementById('bkp-list');if(!el)return;
   el.innerHTML='<div style="font-size:12px;color:var(--tx2)">Ładowanie...</div>';
   try{
-    const rows=await supaFetch('/rest/v1/scafo_backups?select=id,date,hour,created_at&order=created_at.desc&limit=24');
+    const rows=await supaFetch('/rest/v1/scafo_backups?select=id,date,created_at&order=created_at.desc&limit=24');
     if(!rows?.length){el.innerHTML='<div style="font-size:12px;color:var(--tx2)">Brak backupów.</div>';return;}
     el.innerHTML=rows.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px">
-      <div>${r.date} ${r.hour!==undefined?r.hour+':00':''}</div>
+      <div>${r.date} ${r.created_at?new Date(r.created_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):''}</div>
       <button class="btn btn-ghost btn-sm" onclick="restoreBkp('${r.id}')"><i class="ti ti-refresh"></i> Przywróć</button>
     </div>`).join('');
   }catch(e){el.innerHTML='<div style="font-size:12px;color:var(--red)">Błąd ładowania.</div>';}
