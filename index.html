@@ -193,13 +193,13 @@ async function supaFetch(url,opts={}){
 // ══════════════════════════════════
 // DB
 // ══════════════════════════════════
-let DB={workers:[],catalog:[],orders:[],reports:[],shipments:[],adjustments:[],payouts:[],transports:[],vacations:[]};
+let DB={workers:[],catalog:[],orders:[],reports:[],shipments:[],adjustments:[],payouts:[],transports:[],vacations:[],contractors:[]};
 let isSyncing=false;
 let pendingSync=false;
 
 function saveLocal(){
   try{
-    const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations'];
+    const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations','contractors'];
     keys.forEach(k=>localStorage.setItem('scafo_'+k,JSON.stringify(DB[k])));
   }catch(e){console.error('Local save:',e);}
 }
@@ -239,7 +239,7 @@ async function cloudLoad(){
     const localUpdated=new Date(localStorage.getItem('scafo_updated_at')||0);
     // Use cloud data only if it has more reports OR is newer than local
     if(cloudR.length>=localR.length){
-      const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations'];
+      const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations','contractors'];
       keys.forEach(k=>{if(Array.isArray(d[k])) DB[k]=d[k];});
       localStorage.setItem('scafo_updated_at',d.updated_at||'');
       saveLocal();
@@ -961,7 +961,14 @@ function renderMgOrders(){
           <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-order')"><i class="ti ti-x"></i></button>
         </div>
         <input type="hidden" id="ord-id">
-        <div class="form-group"><label class="label">Klient</label><input type="text" id="ord-client" placeholder="Nazwa klienta"></div>
+        <div class="form-group"><label class="label">Kontrahent z katalogu</label>
+          <select id="ord-contractor" onchange="ordContractorChange()">
+            <option value="">— wybierz lub wpisz ręcznie —</option>
+            ${(DB.contractors||[]).map(c=>`<option value="${c.id}">${c.name}${c.city?' · '+c.city:''}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label class="label">Nazwa klienta</label><input type="text" id="ord-client" placeholder="Nazwa klienta"></div>
+        <div class="form-group"><label class="label">Adres dostawy</label><input type="text" id="ord-delivery" placeholder="Adres dostawy (opcjonalne)"></div>
         <div class="form-group"><label class="label">Termin</label><input type="date" id="ord-deadline"></div>
         <div class="form-group"><label class="label">Link do dokumentacji</label><input type="url" id="ord-link" placeholder="https://..."></div>
         <div class="form-group"><label class="label">Opis / dodatkowe informacje</label><textarea id="ord-notes" placeholder="opcjonalne..."></textarea></div>
@@ -1032,17 +1039,24 @@ function openOrderForm(oid=null){
   if(oid){
     const o=DB.orders.find(x=>String(x.id)===String(oid));
     if(o){
+      document.getElementById('ord-contractor').value=o.contractorId||'';
       document.getElementById('ord-client').value=o.client;
       document.getElementById('ord-deadline').value=o.deadline||'';
       document.getElementById('ord-link').value=o.link||'';
       document.getElementById('ord-notes').value=o.notes||'';
+      document.getElementById('ord-delivery').value=o.delivery||'';
+      document.getElementById('ord-delivery').value=o.delivery||'';
       orderItems=[...(o.items||[])];
     }
   } else {
+    document.getElementById('ord-contractor').value='';
     document.getElementById('ord-client').value='';
     document.getElementById('ord-deadline').value='';
     document.getElementById('ord-link').value='';
     document.getElementById('ord-notes').value='';
+    document.getElementById('ord-delivery').value='';
+    document.getElementById('ord-contractor').value='';
+    document.getElementById('ord-delivery').value='';
   }
   renderOrderItems();
   openModal('modal-order');
@@ -1071,6 +1085,23 @@ function addOrderItem(){
   renderOrderItems();
 }
 
+function ordContractorChange(){
+  const cid=document.getElementById('ord-contractor')?.value;
+  if(!cid)return;
+  const c=DB.contractors.find(x=>String(x.id)===String(cid));
+  if(!c)return;
+  document.getElementById('ord-client').value=c.name;
+  if(c.address)document.getElementById('ord-delivery').value=c.address;
+}
+
+function shContractorChange(){
+  const cid=document.getElementById('sh-contractor')?.value;
+  if(!cid)return;
+  const c=DB.contractors.find(x=>String(x.id)===String(cid));
+  if(!c)return;
+  if(c.address){const el=document.getElementById('sh-delivery');if(el)el.value=c.address;}
+}
+
 async function saveOrder(){
   const client=document.getElementById('ord-client').value.trim();
   if(!client){showToast('Podaj nazwę klienta',true);return;}
@@ -1079,12 +1110,14 @@ async function saveOrder(){
   const deadline=document.getElementById('ord-deadline').value||null;
   const link=document.getElementById('ord-link').value.trim()||null;
   const notes=document.getElementById('ord-notes').value.trim()||null;
+  const delivery=document.getElementById('ord-delivery')?.value.trim()||null;
+  const contractorId=document.getElementById('ord-contractor')?.value||null;
   const target=orderItems.reduce((a,i)=>a+i.qty,0);
   if(oid){
     const idx=DB.orders.findIndex(x=>String(x.id)===String(oid));
-    if(idx>=0)DB.orders[idx]={...DB.orders[idx],client,items:orderItems,target,deadline,link,notes};
+    if(idx>=0)DB.orders[idx]={...DB.orders[idx],client,items:orderItems,target,deadline,link,notes,delivery,contractorId};
   } else {
-    DB.orders.push({id:uid(),client,items:orderItems,target,deadline,link,notes,status:'active',created:today()});
+    DB.orders.push({id:uid(),client,items:orderItems,target,deadline,link,notes,delivery,contractorId,status:'active',created:today()});
   }
   closeModal('modal-order');
   const ok=await save();
@@ -1342,11 +1375,13 @@ function renderMgWarehouse(){
       <button class="tab" id="wh-tab-shipments" onclick="whSwitch('shipments')">Wydania</button>
       <button class="tab" id="wh-tab-adjustments" onclick="whSwitch('adjustments')">Korekty</button>
       <button class="tab" id="wh-tab-catalog" onclick="whSwitch('catalog')">Katalog</button>
+      <button class="tab" id="wh-tab-contractors" onclick="whSwitch('contractors')">Kontrahenci</button>
     </div>
     <div id="wh-stock">${renderWhStock()}</div>
     <div id="wh-shipments" style="display:none">${renderWhShipments()}</div>
     <div id="wh-adjustments" style="display:none">${renderWhAdjustments()}</div>
     <div id="wh-catalog" style="display:none">${renderWhCatalog()}</div>
+    <div id="wh-contractors" style="display:none">${renderWhContractors()}</div>
     
     <div id="modal-ship" class="modal-overlay"><div class="modal">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -1354,6 +1389,13 @@ function renderMgWarehouse(){
         <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-ship')"><i class="ti ti-x"></i></button>
       </div>
       <div class="form-group"><label class="label">Zamówienie</label><select id="sh-order" onchange="shOrdChg()"><option value="">— bez zamówienia —</option>${DB.orders.filter(o=>o.status==='active').map(o=>`<option value="${o.id}">${o.client}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="label">Kontrahent (bez zamówienia)</label>
+        <select id="sh-contractor" onchange="shContractorChange()">
+          <option value="">— wybierz kontrahenta —</option>
+          ${(DB.contractors||[]).map(c=>`<option value="${c.id}">${c.name}${c.city?' · '+c.city:''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="label">Adres dostawy</label><input type="text" id="sh-delivery" placeholder="Adres dostawy (opcjonalne)"></div>
       <div class="form-group"><label class="label">Data wydania</label><input type="date" id="sh-date" value="${todayISO()}"></div>
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">Produkty</div>
       <div id="sh-items-list"></div>
@@ -1381,8 +1423,9 @@ function renderMgWarehouse(){
 function whSwitch(tab){
   whTab=tab;
   document.querySelectorAll('[id^="wh-tab-"]').forEach(b=>b.classList.toggle('active',b.id===`wh-tab-${tab}`));
-  ['stock','shipments','adjustments','catalog'].forEach(t=>{const el=document.getElementById(`wh-${t}`);if(el)el.style.display=t===tab?'block':'none';});
+  ['stock','shipments','adjustments','catalog','contractors'].forEach(t=>{const el=document.getElementById(`wh-${t}`);if(el)el.style.display=t===tab?'block':'none';});
   if(tab==='catalog'){const el=document.getElementById('wh-catalog');if(el)el.innerHTML=renderWhCatalog();}
+  if(tab==='contractors'){const el=document.getElementById('wh-contractors');if(el)el.innerHTML=renderWhContractors();}
 }
 
 function renderWhStock(){
@@ -1443,10 +1486,14 @@ async function confirmShip(){
   if(!shItems.length){showToast('Dodaj produkty',true);return;}
   const oid=document.getElementById('sh-order')?.value;
   const o=DB.orders.find(x=>String(x.id)===String(oid));
+  const contractorId=document.getElementById('sh-contractor')?.value||null;
+  const con=DB.contractors.find(x=>String(x.id)===String(contractorId));
   const notes=document.getElementById('sh-notes')?.value.trim();
+  const delivery=document.getElementById('sh-delivery')?.value.trim()||null;
   const dateVal=document.getElementById('sh-date')?.value;
   const shDate=dateVal?isoToPL(dateVal):today();
-  DB.shipments.unshift({id:uid(),orderId:oid||null,client:o?o.client:'',items:[...shItems],notes,date:shDate,time:nowTime(),confirmedBy:currentUser.name,confirmed:true});
+  const clientName=o?o.client:con?con.name:'';
+  DB.shipments.unshift({id:uid(),orderId:oid||null,contractorId,client:clientName,delivery:delivery||(o?.delivery||null),items:[...shItems],notes,date:shDate,time:nowTime(),confirmedBy:currentUser.name,confirmed:true});
   shItems=[];
   closeModal('modal-ship');
   const ok=await save();
@@ -2315,6 +2362,81 @@ function renderWhCatalog(){
   </div>`;
 }
 
+function renderWhContractors(){
+  return`<div style="padding-bottom:20px">
+    <div style="padding:0 16px 10px"><button class="btn btn-primary btn-block" onclick="openContractorForm()"><i class="ti ti-plus"></i> Dodaj kontrahenta</button></div>
+    ${(DB.contractors||[]).length===0?`<div class="empty"><i class="ti ti-building"></i><p>Brak kontrahentów</p></div>`:''}
+    ${(DB.contractors||[]).map(c=>`<div class="item">
+      <div class="item-main">
+        <div class="item-title">${c.name}</div>
+        <div class="item-sub">${[c.address,c.city].filter(Boolean).join(', ')}${c.nip?' · NIP: '+c.nip:''}${c.phone?' · '+c.phone:''}</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick="openContractorForm('${c.id}')"><i class="ti ti-pencil"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="delContractor('${c.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`).join('')}
+    
+    <div id="modal-contractor" class="modal-overlay"><div class="modal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="modal-title" id="con-form-title" style="margin:0">Nowy kontrahent</div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-contractor')"><i class="ti ti-x"></i></button>
+      </div>
+      <input type="hidden" id="con-id">
+      <div class="form-group"><label class="label">Nazwa firmy</label><input type="text" id="con-name" placeholder="np. ACME Sp. z o.o."></div>
+      <div class="form-group"><label class="label">Adres (ulica)</label><input type="text" id="con-address" placeholder="ul. Przykładowa 1"></div>
+      <div class="form-group"><label class="label">Miasto</label><input type="text" id="con-city" placeholder="Warszawa"></div>
+      <div class="form-group"><label class="label">NIP</label><input type="text" id="con-nip" placeholder="000-000-00-00" inputmode="numeric"></div>
+      <div class="form-group"><label class="label">Telefon</label><input type="text" id="con-phone" placeholder="+48 000 000 000" inputmode="tel"></div>
+      <div class="form-group"><label class="label">Email</label><input type="email" id="con-email" placeholder="kontakt@firma.pl"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="saveContractor()"><i class="ti ti-check"></i> Zapisz</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="closeModal('modal-contractor')">Anuluj</button>
+      </div>
+    </div></div>
+  </div>`;
+}
+
+function openContractorForm(cid=null){
+  document.getElementById('con-form-title').textContent=cid?'Edytuj kontrahenta':'Nowy kontrahent';
+  document.getElementById('con-id').value=cid||'';
+  if(cid){
+    const c=(DB.contractors||[]).find(x=>String(x.id)===String(cid));
+    if(c){
+      document.getElementById('con-name').value=c.name||'';
+      document.getElementById('con-address').value=c.address||'';
+      document.getElementById('con-city').value=c.city||'';
+      document.getElementById('con-nip').value=c.nip||'';
+      document.getElementById('con-phone').value=c.phone||'';
+      document.getElementById('con-email').value=c.email||'';
+    }
+  } else {
+    ['con-name','con-address','con-city','con-nip','con-phone','con-email'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }
+  openModal('modal-contractor');
+}
+
+async function saveContractor(){
+  const name=document.getElementById('con-name').value.trim();
+  if(!name){showToast('Podaj nazwę',true);return;}
+  const cid=document.getElementById('con-id').value;
+  const item={name,address:document.getElementById('con-address').value.trim(),city:document.getElementById('con-city').value.trim(),nip:document.getElementById('con-nip').value.trim(),phone:document.getElementById('con-phone').value.trim(),email:document.getElementById('con-email').value.trim()};
+  if(!DB.contractors)DB.contractors=[];
+  if(cid){const idx=DB.contractors.findIndex(x=>String(x.id)===String(cid));if(idx>=0)DB.contractors[idx]={...DB.contractors[idx],...item};}
+  else DB.contractors.push({id:uid(),...item});
+  closeModal('modal-contractor');
+  const ok=await save();
+  showToast(ok?'Kontrahent zapisany!':'Zapisano lokalnie',!ok);
+  const elC=document.getElementById('wh-contractors');if(elC)elC.innerHTML=renderWhContractors();
+}
+
+async function delContractor(cid){
+  if(!confirm('Usunąć kontrahenta?'))return;
+  DB.contractors=(DB.contractors||[]).filter(x=>String(x.id)!==String(cid));
+  await save();
+  const el=document.getElementById('wh-contractors');if(el)el.innerHTML=renderWhContractors();
+}
+
 function renderCatModal(){
   return`<div id="modal-cat" class="modal-overlay"><div class="modal">
     <div class="modal-title" id="cat-form-title">Nowy produkt</div>
@@ -2415,7 +2537,7 @@ async function restoreBkp(bid){
     const rows=await supaFetch(`/rest/v1/scafo_backups?id=eq.${bid}&select=data`);
     if(!rows?.length)throw new Error('Nie znaleziono backupu');
     const data=JSON.parse(rows[0].data);
-    const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations'];
+    const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations','contractors'];
     keys.forEach(k=>{if(data[k])DB[k]=data[k];});
     await save();
     showToast('Dane przywrócone!');
@@ -2448,7 +2570,7 @@ async function importData(e){
   try{
     const text=await file.text();
     const data=JSON.parse(text);
-    const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations'];
+    const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations','contractors'];
     keys.forEach(k=>{if(data[k])DB[k]=data[k];});
     const ok=await save();
     showToast(ok?'Import zakończony!':'Import lokalny',!ok);
