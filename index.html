@@ -233,11 +233,15 @@ async function cloudLoad(){
     const rows=await supaFetch('/rest/v1/scafo_data?id=eq.main&select=*');
     if(!rows?.length){loadLocal();return false;}
     const d=rows[0];
-    const localW=JSON.parse(localStorage.getItem('scafo_workers')||'[]');
-    const cloudW=d.workers||[];
-    if(cloudW.length>=localW.length){
+    const localR=JSON.parse(localStorage.getItem('scafo_reports')||'[]');
+    const cloudR=d.reports||[];
+    const cloudUpdated=new Date(d.updated_at||0);
+    const localUpdated=new Date(localStorage.getItem('scafo_updated_at')||0);
+    // Use cloud data only if it has more reports OR is newer than local
+    if(cloudR.length>=localR.length){
       const keys=['workers','catalog','orders','reports','shipments','adjustments','payouts','transports','vacations'];
-      keys.forEach(k=>{if(d[k]?.length||!DB[k].length) DB[k]=d[k]||[];});
+      keys.forEach(k=>{if(Array.isArray(d[k])) DB[k]=d[k];});
+      localStorage.setItem('scafo_updated_at',d.updated_at||'');
       saveLocal();
     } else {
       loadLocal();
