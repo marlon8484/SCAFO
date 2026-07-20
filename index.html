@@ -497,29 +497,58 @@ function pwSwitch(tab){
   else el.innerHTML=renderPwEarnings();
 }
 
+let pwItems=[];
+
 function renderPwEntry(){
   const pc=sortedCatalog('piecework');
   const todayReps=DB.reports.filter(r=>r.user===currentUser.name&&r.date===today());
   const todayEarn=todayReps.reduce((a,r)=>a+earn(r),0);
+  const totalPreview=pwItems.reduce((a,it)=>{
+    const c=DB.catalog.find(x=>String(x.id)===String(it.catId));
+    return a+Math.round(Number(c?.rate||0)*it.qty*100)/100;
+  },0);
   return `<div style="padding-bottom:20px">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 16px 12px">
       <div class="earn-stat"><div class="earn-stat-val">${fmt(todayEarn)} zł</div><div class="earn-stat-label">Dzisiaj</div></div>
       <div class="earn-stat"><div class="earn-stat-val">${todayReps.reduce((a,r)=>a+r.qtyDone,0)}</div><div class="earn-stat-label">Szt. dzisiaj</div></div>
     </div>
     <div class="quick-entry">
-      <div class="quick-entry-title"><i class="ti ti-plus"></i> Dodaj wpis</div>
-      <select class="quick-select" id="pw-prod" onchange="pwPreview()">
-        <option value="">— wybierz produkt —</option>
+      <div class="quick-entry-title"><i class="ti ti-plus"></i> Nowy wpis</div>
+      
+      <!-- Zmiana i data -->
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <select class="quick-select" id="pw-shift" style="margin-bottom:0;flex:1">
+          <option value="popołudnie">Popołudnie (akord)</option>
+          <option value="rano">Rano</option>
+        </select>
+        <input type="date" id="pw-date" value="${todayISO()}" style="flex:1;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:var(--rsm);color:#fff;padding:10px 12px;font-size:13px;font-family:var(--font);-webkit-appearance:none;">
+      </div>
+      
+      <!-- Lista pozycji -->
+      <div id="pw-items-list" style="margin-bottom:8px">${pwItems.map((it,i)=>{
+        const c=DB.catalog.find(x=>String(x.id)===String(it.catId));
+        const e=Math.round(Number(c?.rate||0)*it.qty*100)/100;
+        return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.2)">
+          <div style="flex:1;color:#fff;font-size:13px">${it.name} — <strong>${it.qty} szt.</strong>${e>0?' · '+fmt(e)+' zł':''}</div>
+          <button style="background:rgba(255,255,255,.15);border:none;border-radius:4px;color:#fff;padding:4px 8px;cursor:pointer;font-size:12px" onclick="pwItems.splice(${i},1);pwRefreshItems()">✕</button>
+        </div>`;
+      }).join('')}</div>
+      
+      ${totalPreview>0?`<div style="color:rgba(255,255,255,.9);font-size:14px;font-weight:600;text-align:center;margin-bottom:10px">Łącznie: ${fmt(totalPreview)} zł</div>`:''}
+      
+      <!-- Dodaj pozycję -->
+      <select class="quick-select" id="pw-prod" style="margin-bottom:6px">
+        <option value="">— dodaj produkt —</option>
         ${pc.map(c=>`<option value="${c.id}" data-rate="${c.rate}">${c.name}</option>`).join('')}
       </select>
-      <input class="quick-qty" type="number" id="pw-qty" placeholder="0" inputmode="numeric" min="1" oninput="pwPreview()">
-      <div class="quick-earn-preview" id="pw-preview"></div>
-      <select class="quick-select" id="pw-shift" style="margin-bottom:8px">
-        <option value="popołudnie">Popołudnie (akord)</option>
-        <option value="rano">Rano</option>
-      </select>
-      <input type="date" id="pw-date" value="${todayISO()}" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:var(--rsm);color:#fff;padding:10px 12px;width:100%;font-size:14px;font-family:var(--font);margin-bottom:10px;-webkit-appearance:none;">
-      <button class="btn btn-success btn-block" onclick="pwSave()"><i class="ti ti-check"></i> Zapisz wpis</button>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input class="quick-qty" type="number" id="pw-qty" placeholder="ilość" inputmode="numeric" min="1" style="margin-bottom:0;font-size:16px">
+        <button style="background:rgba(255,255,255,.25);border:none;border-radius:var(--rsm);color:#fff;padding:10px 16px;font-size:20px;cursor:pointer;font-weight:600" onclick="pwAddItem()">+</button>
+      </div>
+      
+      <button class="btn btn-success btn-block" onclick="pwSave()" ${pwItems.length===0?'style="opacity:.5"':''}>
+        <i class="ti ti-check"></i> Zapisz ${pwItems.length>0?pwItems.length+' pozycj'+(pwItems.length===1?'ę':pwItems.length<5?'e':'i'):'wpis'}
+      </button>
     </div>
     ${todayReps.length?`
       <div class="section"><div class="section-title">Dzisiejsze wpisy</div></div>
@@ -531,29 +560,55 @@ function renderPwEntry(){
   </div>`;
 }
 
-function pwPreview(){
-  const sel=document.getElementById('pw-prod');
-  const qty=parseInt(document.getElementById('pw-qty')?.value)||0;
-  const shift=document.getElementById('pw-shift')?.value;
-  const el=document.getElementById('pw-preview');
-  if(!el)return;
-  if(sel?.value&&qty>0&&shift==='popołudnie'){
-    const rate=parseFloat(sel.options[sel.selectedIndex]?.dataset.rate||0);
-    const e=Math.round(rate*qty*100)/100;
-    el.textContent=e>0?`Zarobek: ${fmt(e)} zł`:'';
-  } else el.textContent='';
+function pwRefreshItems(){
+  const pc=sortedCatalog('piecework');
+  const totalPreview=pwItems.reduce((a,it)=>{
+    const c=DB.catalog.find(x=>String(x.id)===String(it.catId));
+    return a+Math.round(Number(c?.rate||0)*it.qty*100)/100;
+  },0);
+  const el=document.getElementById('pw-items-list');
+  if(el) el.innerHTML=pwItems.map((it,i)=>{
+    const c=DB.catalog.find(x=>String(x.id)===String(it.catId));
+    const e=Math.round(Number(c?.rate||0)*it.qty*100)/100;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.2)">
+      <div style="flex:1;color:#fff;font-size:13px">${it.name} — <strong>${it.qty} szt.</strong>${e>0?' · '+fmt(e)+' zł':''}</div>
+      <button style="background:rgba(255,255,255,.15);border:none;border-radius:4px;color:#fff;padding:4px 8px;cursor:pointer;font-size:12px" onclick="pwItems.splice(${i},1);pwRefreshItems()">✕</button>
+    </div>`;
+  }).join('');
+  // Update total
+  const existing=document.querySelector('.quick-entry [style*="Łącznie"]');
+  // Refresh save button text
+  const btn=document.querySelector('.quick-entry .btn-success');
+  if(btn) btn.innerHTML=`<i class="ti ti-check"></i> Zapisz ${pwItems.length>0?pwItems.length+' pozycj'+(pwItems.length===1?'ę':pwItems.length<5?'e':'i'):'wpis'}`;
 }
 
-async function pwSave(){
+function pwAddItem(){
   const catId=document.getElementById('pw-prod')?.value;
   const qty=parseInt(document.getElementById('pw-qty')?.value)||0;
-  const shift=document.getElementById('pw-shift')?.value||'popołudnie';
   if(!catId){showToast('Wybierz produkt',true);return;}
   if(qty<1){showToast('Podaj ilość',true);return;}
   const c=DB.catalog.find(x=>String(x.id)===String(catId));
+  if(!c)return;
+  // If same product already in list, update qty
+  const existing=pwItems.find(it=>String(it.catId)===String(catId));
+  if(existing){existing.qty+=qty;}
+  else pwItems.push({catId:String(catId),name:c.name,qty});
+  document.getElementById('pw-qty').value='';
+  document.getElementById('pw-prod').value='';
+  pwRefreshItems();
+}
+
+async function pwSave(){
+  if(!pwItems.length){showToast('Dodaj co najmniej jedną pozycję',true);return;}
+  const shift=document.getElementById('pw-shift')?.value||'popołudnie';
   const pwDateVal=document.getElementById('pw-date')?.value;
   const pwDate=pwDateVal?isoToPL(pwDateVal):today();
-  DB.reports.unshift({id:uid(),user:currentUser.name,catalogId:String(catId),orderId:null,projectId:null,name:c?.name||'',qtyDone:qty,shift,date:pwDate,time:nowTime(),hours:null,notes:'',backdate:pwDate!==today(),seenByManager:false});
+  const timeStr=nowTime();
+  pwItems.forEach((it,idx)=>{
+    const c=DB.catalog.find(x=>String(x.id)===String(it.catId));
+    DB.reports.unshift({id:uid()+idx,user:currentUser.name,catalogId:it.catId,orderId:null,projectId:null,name:c?.name||it.name,qtyDone:it.qty,shift,date:pwDate,time:timeStr,hours:null,notes:'',backdate:pwDate!==today(),seenByManager:false});
+  });
+  pwItems=[];
   const ok=await save();
   showToast(ok?'Zapisano! ✓':'Zapisano lokalnie',!ok);
   pwSwitch('entry');
