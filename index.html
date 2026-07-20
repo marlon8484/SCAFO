@@ -1281,10 +1281,12 @@ function renderMgWarehouse(){
       <button class="tab active" id="wh-tab-stock" onclick="whSwitch('stock')">Stan</button>
       <button class="tab" id="wh-tab-shipments" onclick="whSwitch('shipments')">Wydania</button>
       <button class="tab" id="wh-tab-adjustments" onclick="whSwitch('adjustments')">Korekty</button>
+      <button class="tab" id="wh-tab-catalog" onclick="whSwitch('catalog')">Katalog</button>
     </div>
     <div id="wh-stock">${renderWhStock()}</div>
     <div id="wh-shipments" style="display:none">${renderWhShipments()}</div>
     <div id="wh-adjustments" style="display:none">${renderWhAdjustments()}</div>
+    <div id="wh-catalog" style="display:none">${renderWhCatalog()}</div>
     
     <div id="modal-ship" class="modal-overlay"><div class="modal">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -1319,7 +1321,8 @@ function renderMgWarehouse(){
 function whSwitch(tab){
   whTab=tab;
   document.querySelectorAll('[id^="wh-tab-"]').forEach(b=>b.classList.toggle('active',b.id===`wh-tab-${tab}`));
-  ['stock','shipments','adjustments'].forEach(t=>{const el=document.getElementById(`wh-${t}`);if(el)el.style.display=t===tab?'block':'none';});
+  ['stock','shipments','adjustments','catalog'].forEach(t=>{const el=document.getElementById(`wh-${t}`);if(el)el.style.display=t===tab?'block':'none';});
+  if(tab==='catalog'){const el=document.getElementById('wh-catalog');if(el)el.innerHTML=renderWhCatalog();}
 }
 
 function renderWhStock(){
@@ -2235,9 +2238,8 @@ async function delVac(vid){
 // ══════════════════════════════════
 // MANAGER — SETTINGS
 // ══════════════════════════════════
-function renderMgSettings(){
+function renderWhCatalog(){
   return`<div style="padding-bottom:20px">
-    <div class="section"><div class="section-title">Katalog produktów</div></div>
     <div style="padding:0 16px 10px"><button class="btn btn-primary btn-block" onclick="openCatForm()"><i class="ti ti-plus"></i> Dodaj produkt</button></div>
     ${sortedCatalog().map(c=>`<div class="item">
       <div class="item-main">
@@ -2249,8 +2251,35 @@ function renderMgSettings(){
         <button class="btn btn-ghost btn-sm" onclick="delCat('${c.id}')"><i class="ti ti-trash"></i></button>
       </div>
     </div>`).join('')}
-    
-    <div class="section" style="margin-top:8px"><div class="section-title">Backupy</div></div>
+    ${renderCatModal()}
+  </div>`;
+}
+
+function renderCatModal(){
+  return`<div id="modal-cat" class="modal-overlay"><div class="modal">
+    <div class="modal-title" id="cat-form-title">Nowy produkt</div>
+    <input type="hidden" id="cat-id">
+    <div class="form-group"><label class="label">Nazwa</label><input type="text" id="cat-name"></div>
+    <div class="form-group"><label class="label">Jednostka</label><input type="text" id="cat-unit" value="szt."></div>
+    <div class="form-group"><label class="label">Stawka akordu (zł/szt.)</label><input type="number" id="cat-rate" step="0.01" min="0" placeholder="0.00"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <input type="checkbox" id="cat-pw" style="width:20px;height:20px">
+      <label for="cat-pw" style="font-size:13px;cursor:pointer">Produkt akordowy (widoczny dla akordowych)</label>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <input type="checkbox" id="cat-stock" checked style="width:20px;height:20px">
+      <label for="cat-stock" style="font-size:13px;cursor:pointer">Produkt magazynowy</label>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveCat()"><i class="ti ti-check"></i> Zapisz</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="closeModal('modal-cat')">Anuluj</button>
+    </div>
+  </div></div>`;
+}
+
+function renderMgSettings(){
+  return`<div style="padding-bottom:20px">
+    <div class="section"><div class="section-title">Backupy</div></div>
     <div class="card">
       <div style="font-size:13px;margin-bottom:10px">Backup tworzony automatycznie co godzinę po każdym zapisie danych.</div>
       <button class="btn btn-ghost btn-block" onclick="listBkp()"><i class="ti ti-cloud-download"></i> Pokaż backupy (ostatnie 24h)</button>
@@ -2273,25 +2302,6 @@ function renderMgSettings(){
       </div>
     </div>
     
-    <div id="modal-cat" class="modal-overlay"><div class="modal">
-      <div class="modal-title" id="cat-form-title">Nowy produkt</div>
-      <input type="hidden" id="cat-id">
-      <div class="form-group"><label class="label">Nazwa</label><input type="text" id="cat-name"></div>
-      <div class="form-group"><label class="label">Jednostka</label><input type="text" id="cat-unit" value="szt."></div>
-      <div class="form-group"><label class="label">Stawka akordu (zł/szt.)</label><input type="number" id="cat-rate" step="0.01" min="0" placeholder="0.00"></div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        <input type="checkbox" id="cat-pw" style="width:20px;height:20px">
-        <label for="cat-pw" style="font-size:13px;cursor:pointer">Produkt akordowy (widoczny dla akordowych)</label>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <input type="checkbox" id="cat-stock" checked style="width:20px;height:20px">
-        <label for="cat-stock" style="font-size:13px;cursor:pointer">Produkt magazynowy</label>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" style="flex:1" onclick="saveCat()"><i class="ti ti-check"></i> Zapisz</button>
-        <button class="btn btn-ghost" style="flex:1" onclick="closeModal('modal-cat')">Anuluj</button>
-      </div>
-    </div></div>
   </div>`;
 }
 
@@ -2313,14 +2323,17 @@ async function saveCat(){
   closeModal('modal-cat');
   const ok=await save();
   showToast(ok?'Produkt zapisany!':'Zapisano lokalnie',!ok);
-  mgSwitchTab('settings');
+  closeModal('modal-cat');
+  if(whTab==='catalog'){const el=document.getElementById('wh-catalog');if(el)el.innerHTML=renderWhCatalog();}
+  else mgSwitchTab('warehouse');
 }
 
 async function delCat(cid){
   if(!confirm('Usunąć produkt?'))return;
   DB.catalog=DB.catalog.filter(x=>String(x.id)!==String(cid));
   await save();
-  mgSwitchTab('settings');
+  if(whTab==='catalog'){const el=document.getElementById('wh-catalog');if(el)el.innerHTML=renderWhCatalog();}
+  else mgSwitchTab('warehouse');
 }
 
 async function listBkp(){
