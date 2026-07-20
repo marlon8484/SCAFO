@@ -1400,15 +1400,33 @@ function renderMgWarehouse(){
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">Produkty</div>
       <div id="sh-items-list"></div>
       <div style="background:var(--bg3);border-radius:var(--rsm);padding:10px;margin-bottom:10px">
-        <div class="form-group"><select id="sh-prod"><option value="">— produkt z zamówienia —</option></select></div>
-        <div style="font-size:12px;color:var(--tx2);margin-bottom:6px">Lub wpisz ręcznie (poza magazynem):</div>
-        <div style="display:flex;gap:8px;margin-bottom:8px">
+        <!-- Z zamówienia -->
+        <div id="sh-from-order-row">
+          <div style="font-size:11px;font-weight:600;color:var(--tx2);margin-bottom:6px">Z ZAMÓWIENIA</div>
+          <div class="form-group"><select id="sh-prod"><option value="">— produkt z zamówienia —</option></select></div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input type="number" id="sh-item-qty" placeholder="Ilość" min="1" inputmode="numeric" style="flex:1">
+            <button class="btn btn-ghost btn-sm" onclick="shAddFromOrder()"><i class="ti ti-plus"></i></button>
+          </div>
+        </div>
+        <!-- Z magazynu -->
+        <div style="font-size:11px;font-weight:600;color:var(--tx2);margin-bottom:6px">Z MAGAZYNU</div>
+        <div class="form-group">
+          <select id="sh-stock-prod">
+            <option value="">— produkt z magazynu —</option>
+            ${DB.catalog.filter(c=>c.stockItem!==false).sort((a,b)=>a.name.localeCompare(b.name,'pl')).map(c=>{const s=physicalStock(c.id);return`<option value="${c.id}" data-name="${c.name}" data-unit="${c.unit||'szt.'}" data-stock="${s}">${c.name} (stan: ${s} ${c.unit||'szt.'})</option>`;}).join('')}
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="number" id="sh-stock-qty" placeholder="Ilość" min="1" inputmode="numeric" style="flex:1">
+          <button class="btn btn-ghost btn-sm" onclick="shAddFromStock()"><i class="ti ti-plus"></i></button>
+        </div>
+        <!-- Ręcznie -->
+        <div style="font-size:11px;font-weight:600;color:var(--tx2);margin-bottom:6px">INNE (poza magazynem)</div>
+        <div style="display:flex;gap:8px">
           <input type="text" id="sh-custom-name" placeholder="Nazwa" style="flex:2">
           <input type="number" id="sh-custom-qty" placeholder="Szt." min="1" inputmode="numeric" style="flex:1">
-        </div>
-        <div style="display:flex;gap:8px">
-          <input type="number" id="sh-item-qty" placeholder="Ilość z zamówienia" min="1" inputmode="numeric" style="flex:1">
-          <button class="btn btn-ghost btn-sm" onclick="shAddItem()"><i class="ti ti-plus"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="shAddCustom()"><i class="ti ti-plus"></i></button>
         </div>
       </div>
       <div class="form-group"><label class="label">Uwagi</label><textarea id="sh-notes" placeholder="opcjonalne..."></textarea></div>
@@ -1460,27 +1478,56 @@ function shOrdChg(){
   const oid=document.getElementById('sh-order')?.value;
   const o=DB.orders.find(x=>String(x.id)===String(oid));
   const ps=document.getElementById('sh-prod');
-  if(ps&&o?.items?.length)ps.innerHTML=`<option value="">— produkt —</option>`+o.items.map((it,i)=>`<option value="${i}" data-name="${it.name}" data-unit="${it.unit||'szt.'}" data-catid="${it.catId||''}">${it.name} (zam: ${it.qty})</option>`).join('');
+  const row=document.getElementById('sh-from-order-row');
+  if(o?.items?.length){
+    if(ps)ps.innerHTML=`<option value="">— produkt —</option>`+o.items.map((it,i)=>`<option value="${i}" data-name="${it.name}" data-unit="${it.unit||'szt.'}" data-catid="${it.catId||''}">${it.name} (zam: ${it.qty})</option>`).join('');
+    if(row)row.style.display='block';
+  } else {
+    if(row)row.style.display='none';
+  }
 }
 
-function shAddItem(){
+function shAddItem(){shAddFromOrder();}
+
+function shAddFromOrder(){
   const ps=document.getElementById('sh-prod');
-  const qty=parseInt(document.getElementById('sh-item-qty').value)||0;
-  const cn=document.getElementById('sh-custom-name')?.value.trim();
-  const cq=parseInt(document.getElementById('sh-custom-qty')?.value)||0;
-  if(cn&&cq>0){
-    shItems.push({name:cn,qty:cq,unit:'szt.',catId:null,custom:true});
-    document.getElementById('sh-custom-name').value='';
-    document.getElementById('sh-custom-qty').value='';
-  } else if(ps?.value&&qty>0){
-    const opt=ps.options[ps.selectedIndex];
-    shItems.push({name:opt.dataset.name,qty,unit:opt.dataset.unit||'szt.',catId:opt.dataset.catid||null});
-    document.getElementById('sh-item-qty').value='';
-  } else{showToast('Podaj produkt i ilość',true);return;}
+  const qty=parseInt(document.getElementById('sh-item-qty')?.value)||0;
+  if(!ps?.value||qty<1){showToast('Wybierz produkt i podaj ilość',true);return;}
+  const opt=ps.options[ps.selectedIndex];
+  shItems.push({name:opt.dataset.name,qty,unit:opt.dataset.unit||'szt.',catId:opt.dataset.catid||null,fromOrder:true});
+  document.getElementById('sh-item-qty').value='';
   renderShItems();
 }
 
-function renderShItems(){const el=document.getElementById('sh-items-list');if(!el)return;el.innerHTML=shItems.map((it,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:13px"><div style="flex:1">${it.name} — ${it.qty} ${it.unit}</div><button class="btn btn-ghost btn-sm" onclick="shItems.splice(${i},1);renderShItems()"><i class="ti ti-x"></i></button></div>`).join('');}
+function shAddFromStock(){
+  const ps=document.getElementById('sh-stock-prod');
+  const qty=parseInt(document.getElementById('sh-stock-qty')?.value)||0;
+  if(!ps?.value||qty<1){showToast('Wybierz produkt i podaj ilość',true);return;}
+  const opt=ps.options[ps.selectedIndex];
+  const stock=parseInt(opt.dataset.stock||0);
+  if(qty>stock){showToast(`Brak wystarczającej ilości (stan: ${stock})`,true);return;}
+  shItems.push({name:opt.dataset.name,qty,unit:opt.dataset.unit||'szt.',catId:ps.value,fromStock:true});
+  document.getElementById('sh-stock-qty').value='';
+  renderShItems();
+}
+
+function shAddCustom(){
+  const name=document.getElementById('sh-custom-name')?.value.trim();
+  const qty=parseInt(document.getElementById('sh-custom-qty')?.value)||0;
+  if(!name||qty<1){showToast('Podaj nazwę i ilość',true);return;}
+  shItems.push({name,qty,unit:'szt.',catId:null,custom:true});
+  document.getElementById('sh-custom-name').value='';
+  document.getElementById('sh-custom-qty').value='';
+  renderShItems();
+}
+
+function renderShItems(){
+  const el=document.getElementById('sh-items-list');if(!el)return;
+  el.innerHTML=shItems.map((it,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:13px">
+    <div style="flex:1">${it.name} — ${it.qty} ${it.unit}${it.fromStock?' <span class=\"badge badge-green\" style=\"font-size:10px\">mag.</span>':it.fromOrder?' <span class=\"badge badge-blue\" style=\"font-size:10px\">zam.</span>':it.custom?' <span class=\"badge badge-amber\" style=\"font-size:10px\">inne</span>':''}</div>
+    <button class="btn btn-ghost btn-sm" onclick="shItems.splice(${i},1);renderShItems()"><i class="ti ti-trash"></i></button>
+  </div>`).join('');
+}
 
 async function confirmShip(){
   if(!shItems.length){showToast('Dodaj produkty',true);return;}
