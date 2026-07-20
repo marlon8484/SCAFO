@@ -909,6 +909,7 @@ function renderMgOrders(){
         <div class="form-group"><label class="label">Klient</label><input type="text" id="ord-client" placeholder="Nazwa klienta"></div>
         <div class="form-group"><label class="label">Termin</label><input type="date" id="ord-deadline"></div>
         <div class="form-group"><label class="label">Link do dokumentacji</label><input type="url" id="ord-link" placeholder="https://..."></div>
+        <div class="form-group"><label class="label">Opis / dodatkowe informacje</label><textarea id="ord-notes" placeholder="opcjonalne..."></textarea></div>
         <div style="font-size:13px;font-weight:600;margin-bottom:8px">Produkty</div>
         <div id="ord-items"></div>
         <div style="background:var(--bg3);border-radius:var(--rsm);padding:12px;margin-bottom:12px">
@@ -979,12 +980,14 @@ function openOrderForm(oid=null){
       document.getElementById('ord-client').value=o.client;
       document.getElementById('ord-deadline').value=o.deadline||'';
       document.getElementById('ord-link').value=o.link||'';
+      document.getElementById('ord-notes').value=o.notes||'';
       orderItems=[...(o.items||[])];
     }
   } else {
     document.getElementById('ord-client').value='';
     document.getElementById('ord-deadline').value='';
     document.getElementById('ord-link').value='';
+    document.getElementById('ord-notes').value='';
   }
   renderOrderItems();
   openModal('modal-order');
@@ -1020,12 +1023,13 @@ async function saveOrder(){
   const oid=document.getElementById('ord-id').value;
   const deadline=document.getElementById('ord-deadline').value||null;
   const link=document.getElementById('ord-link').value.trim()||null;
+  const notes=document.getElementById('ord-notes').value.trim()||null;
   const target=orderItems.reduce((a,i)=>a+i.qty,0);
   if(oid){
     const idx=DB.orders.findIndex(x=>String(x.id)===String(oid));
-    if(idx>=0)DB.orders[idx]={...DB.orders[idx],client,items:orderItems,target,deadline,link};
+    if(idx>=0)DB.orders[idx]={...DB.orders[idx],client,items:orderItems,target,deadline,link,notes};
   } else {
-    DB.orders.push({id:uid(),client,items:orderItems,target,deadline,link,status:'active',created:today()});
+    DB.orders.push({id:uid(),client,items:orderItems,target,deadline,link,notes,status:'active',created:today()});
   }
   closeModal('modal-order');
   const ok=await save();
@@ -1055,6 +1059,7 @@ function openOrderDetail(oid){
   const done=orderTotalDone(oid),pp=pct(done,o.target);
   document.getElementById('ord-detail-content').innerHTML=`
     ${o.link?`<a href="${o.link}" target="_blank" class="btn btn-ghost btn-block" style="margin-bottom:12px;text-decoration:none"><i class="ti ti-paperclip"></i> Dokumentacja</a>`:''}
+    ${o.notes?`<div style="background:var(--bg3);border-radius:var(--rsm);padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--tx2)">${o.notes}</div>`:''}
     <div class="progress" style="height:10px;margin-bottom:8px"><div class="progress-bar" style="width:${pp}%;height:10px"></div></div>
     <div style="font-size:13px;color:var(--tx2);margin-bottom:16px">${done} / ${o.target} szt. (${pp}%)</div>
     ${(o.items||[]).map(it=>{
