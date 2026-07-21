@@ -748,7 +748,10 @@ function renderWReport(){
       <div id="w-items"></div>
       <div style="background:var(--bg3);border-radius:var(--rsm);padding:12px;margin-bottom:10px">
         <div class="form-group"><select id="w-type" onchange="wTypeChg()"><option value="">— wybierz typ —</option><option value="catalog">Produkt z katalogu</option><option value="order">Zamówienie</option><option value="custom">Inne</option></select></div>
-        <div id="w-cat-r" style="display:none" class="form-group"><select id="w-cat">${ac.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
+        <div id="w-cat-r" style="display:none" class="form-group">
+          <select id="w-cat" onchange="wCatChg()">${ac.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+          <div id="w-cat-order-hint" style="display:none;margin-top:8px;background:var(--lblue);border-radius:var(--rsm);padding:8px 10px;font-size:12px;color:var(--blue)"></div>
+        </div>
         <div id="w-ord-r" style="display:none" class="form-group">
           <select id="w-ord" onchange="wOrdChg()">${DB.orders.filter(o=>o.status==='active').map(o=>`<option value="${o.id}">${o.client}</option>`).join('')}</select>
           <div id="w-ord-item-r" style="display:none;margin-top:6px"><select id="w-ord-item"></select></div>
@@ -775,6 +778,44 @@ function wTypeChg(){
   document.getElementById('w-ord-r').style.display=t==='order'?'block':'none';
   document.getElementById('w-cust-r').style.display=t==='custom'?'block':'none';
   if(t==='order')wOrdChg();
+}
+
+function wCatChg(){
+  const catId=document.getElementById('w-cat')?.value;
+  const hint=document.getElementById('w-cat-order-hint');
+  if(!catId||!hint){return;}
+  // Find active orders that contain this product
+  const matchingOrders=DB.orders.filter(o=>o.status==='active'&&o.items?.some(it=>String(it.catId)===String(catId)));
+  if(matchingOrders.length>0){
+    hint.style.display='block';
+    hint.innerHTML=`<i class="ti ti-info-circle" style="font-size:12px"></i> Ten produkt jest w aktywnym zamówieniu: 
+      ${matchingOrders.map(o=>`<strong style="cursor:pointer;text-decoration:underline" onclick="wSwitchToOrder('${o.id}','${catId}')">${o.client}</strong>`).join(', ')}
+      <br><span style="color:var(--tx2)">Kliknij nazwę żeby przypisać do zamówienia</span>`;
+  } else {
+    hint.style.display='none';
+    hint.innerHTML='';
+  }
+}
+
+function wSwitchToOrder(orderId, catId){
+  // Switch to order mode and preselect
+  const typeEl=document.getElementById('w-type');
+  if(typeEl){typeEl.value='order';wTypeChg();}
+  const ordEl=document.getElementById('w-ord');
+  if(ordEl){ordEl.value=orderId;wOrdChg();}
+  // Find and select the right item
+  setTimeout(()=>{
+    const o=DB.orders.find(x=>String(x.id)===String(orderId));
+    if(!o)return;
+    const itemIdx=o.items?.findIndex(it=>String(it.catId)===String(catId));
+    if(itemIdx>=0){
+      const is=document.getElementById('w-ord-item');
+      if(is)is.value=itemIdx;
+    }
+    // Hide hint
+    const hint=document.getElementById('w-cat-order-hint');
+    if(hint){hint.style.display='none';}
+  },50);
 }
 
 function wOrdChg(){
